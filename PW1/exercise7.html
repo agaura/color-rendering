@@ -1,0 +1,57 @@
+<html>
+
+<head>
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+</head>
+
+<body>
+    <a-scene>
+        <a-cylinder position="0 0 -5" radius="1" height="0.1" color="#FFC65D">
+            <a-entity position="0 0.25 0" rotation="0 0 0"
+                animation="property: rotation; to: 0 -30 -45; loop: true; dir: alternate; dur: 3000">
+                <a-sphere position="0 0 0" radius="0.3" color="#EF2D5E">
+                    <a-box position="0 1 0" rotation="0 0 0" depth="0.25" height="2" width="0.25" color="#4CC3D9">
+                        <a-sphere position="0 1 0" radius="0.3" color="#EF2D5E">
+                            <a-entity rotation="0 0 0"
+                                animation="property: rotation; to: 30 45 -90; loop: true; dir: alternate; dur: 4000">
+                                <a-box position="0 1 0" rotation="0 0 0" depth="0.25" height="2" width="0.25"
+                                    color="#4CC3D9">
+                                    <a-sphere position="0 1 0" radius="0.3" color="#EF2D5E">
+                                        <a-box position="0 0.3 0" rotation="0 0 0" depth="0.2" height="0.6" width="0.2"
+                                            color="#4CC3D9">
+                                            <a-entity position="0 0.3 0.2"
+                                                animation="property: position; to: 0 0.3 0.1; loop: true; dir: alternate; dur: 1000">
+                                                <a-box position="0 0 0" rotation="90 0 0" depth="0.1" height="0.4"
+                                                    width="0.1" color="#4CC3D9">
+                                                    <a-box position="0 0.15 -0.15" rotation="90 0 0" depth="0.1"
+                                                        height="0.3" width="0.1" color="#4CC3D9">
+                                                        <a-box position="0 -0.225 0.125" rotation="-45 0 0" depth="0.1"
+                                                            height="0.3" width="0.1" color="#4CC3D9"></a-box>
+                                                    </a-box>
+                                                </a-box>
+                                            </a-entity>
+                                            <a-entity position="0 0.3 -0.2"
+                                                animation="property: position; to: 0 0.3 -0.1; loop: true; dir: alternate; dur: 1000">
+                                                <a-box position="0 0 0" rotation="90 0 0" depth="0.1" height="0.4"
+                                                    width="0.1" color="#4CC3D9">
+                                                    <a-box position="0 -0.15 -0.15" rotation="90 0 0" depth="0.1"
+                                                        height="0.3" width="0.1" color="#4CC3D9">
+                                                        <a-box position="0 -0.225 -0.125" rotation="45 0 0" depth="0.1"
+                                                            height="0.3" width="0.1" color="#4CC3D9"></a-box>
+                                                    </a-box>
+                                                </a-box>
+                                            </a-entity>
+                                        </a-box>
+                                    </a-sphere>
+                                </a-box>
+                            </a-entity>
+                        </a-sphere>
+                    </a-box>
+                </a-sphere>
+            </a-entity>
+        </a-cylinder>
+        <a-plane position="0 0 -5" rotation="-90 0 0" width="4" height="4" color="#7BC8A4"></a-plane>
+    </a-scene>
+</body>
+
+</html>

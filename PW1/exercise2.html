@@ -1,0 +1,17 @@
+<html>
+
+<head>
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+</head>
+
+<body>
+  <a-scene>
+    <a-sphere src="earth_4096.jpg" position="0 1.25 -5" radius="1" shadow="cast: true"></a-sphere>
+    <a-plane position="0 0 -4" rotation="-90 0 0" width="4" height="4" color="#e8548c" shadow="receive: true"></a-plane>
+    <a-sky color="#000000"></a-sky>
+    <a-entity light="type: ambient; intensity: 0.5;"></a-entity>
+    <a-entity light="type: directional; castShadow: true; intensity: 0.4;" position="0 3 -5"></a-entity>
+  </a-scene>
+</body>
+
+</html>
