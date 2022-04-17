@@ -1,0 +1,433 @@
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Exercise 1</title>
+  <style>
+    body {
+      margin: 0;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- <script src="js/three.js"></script> -->
+  <script type="text/javascript" src="http://lo-th.github.io/uil/build/uil.js"></script>
+  <script type="text/javascript" src="http://lo-th.github.io/uil/examples/js/math.js"></script>
+  <script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.125.0';
+    import { OrbitControls } from 'https://cdn.skypack.dev/three@0.125.0/examples/jsm/controls/OrbitControls.js';
+    import { VRButton } from 'https://cdn.skypack.dev/three@0.125.0/examples/jsm/webxr/VRButton.js';
+    
+    var π = Math.PI;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(100, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    let controls = new OrbitControls(camera, renderer.domElement);
+    document.body.appendChild( VRButton.createButton( renderer ) );
+    renderer.xr.setReferenceSpaceType( 'local' );
+    renderer.xr.enabled = true;
+
+    // lights and camera
+
+    camera.position.z = 40;
+    camera.position.y = 0;
+    camera.rotation.x = 0;
+
+    camera.zoom = 2;
+    camera.updateProjectionMatrix();
+
+    const light1 = new THREE.PointLight(0xFFFFFF, 1);
+    light1.position.set(0, 0, 10);
+    light1.castShadow = true;
+    scene.add(light1);
+
+    const ambient = new THREE.AmbientLight( 0x404040 ); // soft white light
+        scene.add( ambient );
+
+    // materials and geometries
+
+    const white = new THREE.MeshLambertMaterial({
+      side: THREE.DoubleSide,
+    });
+    white.color.setRGB(1, 1, 1);
+
+    const red = new THREE.MeshLambertMaterial({
+      side: THREE.DoubleSide,
+    });
+    red.color.setRGB(0.75, 0, 0);
+
+    const green = new THREE.MeshLambertMaterial({
+      side: THREE.DoubleSide,
+    });
+    green.color.setRGB(0, 0.75, 0);
+
+    const plane = new THREE.PlaneGeometry(20, 20, 1, 1);
+
+    const settings = {
+            opacity: 1,
+			color: 0x000000,
+			rotationCone: Math.PI,
+            rotationCyl: Math.PI / 4,
+            rotationSphere: 7 * Math.PI / 4,
+            scale: 1
+		};
+
+    const parameters = {
+        alphaMap: null,
+
+        aoMap: null,
+        aoMapIntensity: 1,
+
+        clearcoat : 1,
+        clearcoatMap : null,
+
+        clearcoatRoughness : 1,
+        clearcoatRoughnessMap : null,
+
+        color: 0xffffff,
+        combine: 2,
+
+        displacementMap : null,
+        displacementScale : 1,
+        displacementBias : 0,
+
+        emissive: 0x000000,
+        emissiveMap: null,
+
+        envMap: null,
+
+        lightMap: null,
+        lightMapIntensity: 1,
+
+        map: null,
+
+        reflectivity: 1,
+
+        shininess: 100,
+
+        specular: 0x111111,
+
+        specularMap: null,
+
+        transmission : 0,
+        transmissionMap : null,
+
+        wireframe: false,
+
+        transparent: true,
+        side: THREE.DoubleSide,
+        alphaTest: 0,
+        opacity: 1,
+    }
+
+
+
+    const cone_mat = new THREE.MeshLambertMaterial(parameters);
+
+    const cyl_mat = new THREE.MeshPhongMaterial(parameters);
+
+    const sphere_mat = new THREE.MeshPhysicalMaterial(parameters);
+
+    // building the objects
+
+    const floor = new THREE.Mesh(plane, white);
+    floor.rotation.x = -π / 2;
+    floor.position.y = -10;
+    floor.position.z = 10;
+
+    const ceil = new THREE.Mesh(plane, white);
+    ceil.material.side = THREE.DoubleSide;
+    ceil.rotation.x = -π / 2;
+    ceil.rotation.y = π;
+    ceil.position.y = 10;
+    ceil.position.z = 10;
+
+    const back_wall = new THREE.Mesh(plane, white);
+    back_wall.position.x = 0;
+    back_wall.position.y = 0;
+    back_wall.position.z = 0;
+
+    const left_wall = new THREE.Mesh(plane, red);
+    left_wall.rotation.y = -π / 2;
+    left_wall.position.x = -10;
+    left_wall.position.z = 10;
+
+    const right_wall = new THREE.Mesh(plane, green);
+    right_wall.rotation.y = -π / 2 + 0;
+    right_wall.position.x = 10;
+    right_wall.position.z = 10;
+
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(3, 6, 20), cone_mat);
+    var uv1Array = cone.geometry.getAttribute("uv").array;
+    cone.geometry.setAttribute( 'uv2', new THREE.BufferAttribute( uv1Array, 2 ) );
+    cone.position.x = -5;
+    cone.position.y = -7;
+    cone.position.z = 10;
+
+    const cyl = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 10, 20), cyl_mat);
+    uv1Array = cyl.geometry.getAttribute("uv").array;
+    cyl.geometry.setAttribute( 'uv2', new THREE.BufferAttribute( uv1Array, 2 ) );
+    cyl.position.x = 4;
+    cyl.position.y = -5;
+    cyl.position.z = 5;
+
+    const sphere = new THREE.Mesh(new THREE.SphereGeometry(3, 20, 20), sphere_mat);
+    uv1Array = sphere.geometry.getAttribute("uv").array;
+    sphere.geometry.setAttribute( 'uv2', new THREE.BufferAttribute( uv1Array, 2 ) );
+    sphere.position.x = 2;
+    sphere.position.y = -7;
+    sphere.position.z = 15;
+
+    const coneshadow = new THREE.Mesh(new THREE.CircleGeometry(3.5, 1), new THREE.MeshLambertMaterial({side: THREE.DoubleSide, transparent: true}));
+    scene.add(coneshadow);
+    cone.add(coneshadow);
+    coneshadow.material.color.setHex(0x000000);
+    coneshadow.rotation.x = Math.PI / 2;
+    coneshadow.position.y = -2.99;
+    coneshadow.position.x = 2;
+
+    cone.rotation.y = settings.rotationCone;
+
+    const cylshadow = new THREE.Mesh(new THREE.CircleGeometry(2.5, 20, 3 * Math.PI / 2, Math.PI), new THREE.MeshLambertMaterial({side: THREE.DoubleSide, transparent: true}));
+    scene.add(cylshadow);
+    cyl.add(cylshadow);
+    cylshadow.material.color.setHex(0x000000);
+    cylshadow.rotation.x = Math.PI / 2;
+    cylshadow.position.y = -4.99;
+    cylshadow.position.x = 5;
+
+    const cylshadow2 = new THREE.Mesh(new THREE.PlaneGeometry(5, 5, 1, 1), new THREE.MeshLambertMaterial({side: THREE.DoubleSide, transparent: true}));
+    scene.add(cylshadow2);
+    cylshadow.add(cylshadow2);
+    cylshadow2.material.color.setHex(0x000000);
+    cylshadow2.position.x = -2.5;
+    cylshadow2.position.z = 0;
+
+    cyl.rotation.y = settings.rotationCyl;
+
+    const sphereshadow = new THREE.Mesh(new THREE.CircleGeometry(3, 20), new THREE.MeshLambertMaterial({side: THREE.DoubleSide, transparent: true}));
+    scene.add(sphereshadow);
+    sphere.add(sphereshadow);
+    sphereshadow.material.color.setHex(0x000000);
+    sphereshadow.rotation.x = Math.PI / 2;
+    sphereshadow.position.y = -2.99;
+    sphereshadow.position.x = 2;
+
+    sphere.rotation.y = settings.rotationSphere;
+
+    var alphaMap;
+    var aoMap;
+    var clearcoatMap;
+    var clearcoatRoughnessMap;
+    var displacementMap;
+    var emissiveMap;
+    var envMap;
+    var lightMap;
+    var map;
+    var transmissionMap;
+    
+    let ui = new UIL.Gui({ w: 550, h: 26, close: false });
+    ui.add('selector', { name:'map', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            map = null;
+        }
+        else {map = new THREE.TextureLoader().load('texture'+p+'.png');}
+        cone.material.map = map; 
+        cone.material.needsUpdate = true;
+        cyl.material.map = map; 
+        cyl.material.needsUpdate = true;
+        sphere.material.map = map;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add( parameters, 'color', { type:'color', } ).onChange( function( p ){cone.material.color.setHex(p); cyl.material.color.setHex(p); sphere.material.color.setHex(p);} );
+    ui.add( parameters, 'emissive', { type:'color', } ).onChange( function( p ){cone.material.emissive.setHex(p); cyl.material.emissive.setHex(p); sphere.material.emissive.setHex(p);} );
+    ui.add( parameters, 'specular', { type:'color', } ).onChange( function( p ){cone.material.specular.setHex(p); cyl.material.specular.setHex(p); sphere.material.specular.setHex(p);} );
+
+
+    ui.add( parameters, 'aoMapIntensity', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.aoMapIntensity = p; cyl.material.aoMapIntensity = p; sphere.material.aoMapIntensity = p;} );
+    ui.add( parameters, 'clearcoat', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.clearcoat = p; cyl.material.clearcoat = p; sphere.material.clearcoat = p;} );
+    ui.add( parameters, 'clearcoatRoughness', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.clearcoatRoughness = p; cyl.material.clearcoatRoughness = p; sphere.material.clearcoatRoughness = p;} );
+    ui.add( parameters, 'displacementScale', { min:0, max:2.5, precision:2 } ).onChange( function( p ){ cone.material.displacementScale = p; cyl.material.displacementScale = p; sphere.material.displacementScale = p;} );
+    ui.add( parameters, 'displacementBias', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.displacementBias = p; cyl.material.displacementBias = p; sphere.material.displacementBias = p;} );
+    ui.add( parameters, 'lightMapIntensity', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.lightMapIntensity = p; cyl.material.lightMapIntensity = p; sphere.material.lightMapIntensity = p;} );
+    ui.add( parameters, 'opacity', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.opacity = p; cyl.material.opacity = p; sphere.material.opacity = p;} );
+    ui.add( parameters, 'reflectivity', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.reflectivity = p; cyl.material.reflectivity = p; sphere.material.reflectivity = p;} );
+    ui.add( parameters, 'shininess', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.shininess = p; cyl.material.shininess = p; sphere.material.shininess = p;} );
+    ui.add( parameters, 'transmission', { min:0, max:1, precision:2 } ).onChange( function( p ){ cone.material.transmission = p; cyl.material.transmission = p; sphere.material.transmission = p;} );
+    ui.add( parameters, 'wireframe', { type: 'bool' } ).onChange( function( p ){ cone.material.wireframe = p; cyl.material.wireframe = p; sphere.material.wireframe = p;} );
+
+
+    ui.add('selector', { name:'alphaMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            alphaMap = null;
+        }
+        else {alphaMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.alphaMap = alphaMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.alphaMap = alphaMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.alphaMap = alphaMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'aoMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            aoMap = null;
+        }
+        else {aoMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.aoMap = aoMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.aoMap = aoMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.aoMap = aoMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'clearcoatMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            clearcoatMap = null;
+        }
+        else {clearcoatMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.clearcoatMap = clearcoatMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.clearcoatMap = clearcoatMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.clearcoatMap = clearcoatMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'clearcoatRoughnessMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            clearcoatRoughnessMap = null;
+        }
+        else {clearcoatRoughnessMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.clearcoatRoughnessMap = clearcoatRoughnessMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.clearcoatRoughnessMap = clearcoatRoughnessMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.clearcoatRoughnessMap = clearcoatRoughnessMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'displacementMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            displacementMap = null;
+        }
+        else {displacementMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.displacementMap = displacementMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.displacementMap = displacementMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.displacementMap = displacementMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'emissiveMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            emissiveMap = null;
+        }
+        else {emissiveMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.emissiveMap = emissiveMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.emissiveMap = emissiveMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.emissiveMap = emissiveMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'envMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            envMap = null;
+        }
+        else {envMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.envMap = envMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.envMap = envMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.envMap = envMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'lightMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            lightMap = null;
+        }
+        else {lightMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.lightMap = lightMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.lightMap = lightMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.lightMap = lightMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'specularMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            specularMap = null;
+        }
+        else {specularMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.specularMap = specularMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.specularMap = specularMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.specularMap = specularMap;
+        sphere.material.needsUpdate = true;
+        } );
+    ui.add('selector', { name:'transmissionMap', value:0, values:[0, 1, 2, 3, 4, 5] }).onChange( function( p ){ 
+        if (p == 0) {
+            transmissionMap = null;
+        }
+        else {transmissionMap = new THREE.TextureLoader().load('alpha'+p+'.png');}
+        cone.material.transmissionMap = transmissionMap; 
+        cone.material.needsUpdate = true;
+        cyl.material.transmissionMap = transmissionMap; 
+        cyl.material.needsUpdate = true;
+        sphere.material.transmissionMap = transmissionMap;
+        sphere.material.needsUpdate = true;
+        } );
+
+    let ui2 = new UIL.Gui({ css:'top:0px; left:0%;', w: 550, h: 26, close: false });
+    ui2.add( settings, 'opacity', { min:0, max:1, precision:2 } ).onChange( function( p ){
+        coneshadow.material.opacity = p; 
+        cylshadow.material.opacity = p;
+        cylshadow2.material.opacity = p;
+        sphereshadow.material.opacity = p;
+    } );
+    ui2.add( settings, 'color', { type:'color', } ).onChange( function( p ){coneshadow.material.color.setHex(p); cylshadow.material.color.setHex(p);
+        cylshadow2.material.color.setHex(p); sphereshadow.material.color.setHex(p);} );
+    ui2.add( settings, 'rotationCone', { min:0, max: 2 * Math.PI, precision:2 } ).onChange( function( p ){cone.rotation.y = p;});
+    ui2.add( settings, 'rotationCyl', { min:0, max: 2 * Math.PI, precision:2 } ).onChange( function( p ){cyl.rotation.y = p;});
+    ui2.add( settings, 'rotationSphere', { min:0, max: 2 * Math.PI, precision:2 } ).onChange( function( p ){sphere.rotation.y = p;});
+    ui2.add( settings, 'scale', { min:0, max: 2, precision:2 } ).onChange( function( p ){
+        coneshadow.scale.x = p;
+        coneshadow.position.x = 2 + 2 * (p - 1);
+
+        cylshadow.scale.x = p;
+        cylshadow.position.x = 5 + 5 * (p - 1);
+
+        sphereshadow.scale.x = p;
+        sphereshadow.position.x = 2 + 2 * (p - 1);
+    });
+
+
+    // adding to the scene
+
+    scene.add(floor);
+    scene.add(ceil);
+    scene.add(back_wall);
+    scene.add(left_wall);
+    scene.add(right_wall);
+    scene.add(cone);
+    scene.add(cyl);
+    scene.add(sphere);
+
+    function animate() {
+      //requestAnimationFrame(animate);
+      controls.update();
+      renderer.setAnimationLoop( function () {
+        renderer.render( scene, camera );
+      } );
+      renderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,501 @@
+<!-- Licensed under a BSD license. See license.html for license -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Three.js - Picking - RayCaster</title>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        #c {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="c"></canvas>
+</body>
+<script type="module">
+    import * as THREE from 'https://cdn.skypack.dev/three@0.125.0';
+    import { OrbitControls } from 'https://cdn.skypack.dev/three@0.125.0/examples/jsm/controls/OrbitControls.js';
+    import { VRButton } from 'https://cdn.skypack.dev/three@0.125.0/examples/jsm/webxr/VRButton.js';
+
+    var π = Math.PI;
+
+    function main() {
+        const canvas = document.querySelector('#c');
+        const renderer = new THREE.WebGLRenderer({ canvas });
+        document.body.appendChild( VRButton.createButton( renderer ) );
+        renderer.xr.enabled = true;
+        renderer.xr.setReferenceSpaceType( 'local' );
+
+        const fov = 60;
+        const aspect = 1;  // the canvas default
+        const near = 0.1;
+        const far = 200;
+        const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+        camera.position.z = 40;
+
+        let controls = new OrbitControls(camera, renderer.domElement);
+
+        const scene = new THREE.Scene();
+
+        const color = 0xFFFFFF;
+        const intensity = 1;
+        const light = new THREE.DirectionalLight(color, intensity);
+        light.position.set(-1, 2, 4);
+        scene.add(light)
+
+        const ambient = new THREE.AmbientLight( 0x404040 ); // soft white light
+        scene.add( ambient );
+
+        const white = new THREE.MeshLambertMaterial({
+            side: THREE.DoubleSide,
+        });
+        white.color.setRGB(1, 1, 1);
+
+        const cyl_mat = new THREE.MeshPhongMaterial({
+            side: THREE.DoubleSide,
+        })
+        cyl_mat.color.setRGB(1, 0, 0);
+
+        const arm_mat = new THREE.MeshPhongMaterial({
+            side: THREE.DoubleSide,
+        })
+        arm_mat.color.setRGB(0.1, 0.1, 0.1);
+
+        const hand_mat = new THREE.MeshPhongMaterial({
+            side: THREE.DoubleSide,
+        })
+        hand_mat.color.setRGB(0.4, 0.4, 0.4);
+
+        const plane = new THREE.PlaneGeometry(20, 20, 1, 1);
+
+        // building the objects
+
+        const floor = new THREE.Mesh(plane, white);
+        floor.rotation.x = -π / 2;
+        floor.position.y = -10;
+        scene.add(floor);
+
+        const cyl = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, 0.5, 20), cyl_mat);
+        cyl.position.x = 0;
+        cyl.position.y = -9.75;
+        scene.add(cyl);
+
+        const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 20), arm_mat);
+        scene.add(sphere)
+        cyl.add(sphere);
+        sphere.position.y = 0.5;
+
+        const cyl2 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 2, 20), cyl_mat);
+        cyl2.rotation.x = -0.5;
+        cyl2.position.z = -1;
+        scene.add(cyl2);
+        sphere.add(cyl2);
+        cyl2.position.y = 1;
+
+        // sphere.rotation.x = -π / 4;
+        // sphere.rotation.z = -π / 4;
+        // sphere.updateMatrix();
+        // sphere.geometry.applyMatrix(sphere.matrix);
+        // sphere.rotation.set(0, 0, 0);
+        // sphere.updateMatrix();
+
+        const sphere2 = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 20), arm_mat);
+        scene.add(sphere2)
+        cyl2.add(sphere2);
+        sphere2.position.y = 1;
+
+        const cyl3 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 6, 20), cyl_mat);
+        scene.add(cyl3);
+        sphere2.add(cyl3);
+        cyl3.position.y = 3;
+
+        sphere2.rotation.x = 0.5;
+
+        const sphere3 = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 20), arm_mat);
+        scene.add(sphere3)
+        cyl3.add(sphere3);
+        sphere3.position.y = 3;
+
+        const cyl4 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 8, 20), cyl_mat);
+        scene.add(cyl4);
+        sphere3.add(cyl4);
+        cyl4.position.y = 4;
+
+        const sphere4 = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 20), arm_mat);
+        scene.add(sphere4);
+        cyl4.add(sphere4);
+        sphere4.position.y = 4;
+
+        const cyl5 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 20), hand_mat);
+        scene.add(cyl5);
+        sphere4.add(cyl5);
+        cyl5.rotation.z = 0.3;
+        cyl5.position.x = -0.75;
+        cyl5.position.y = 1;
+
+        const cyl6 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 20), hand_mat);
+        scene.add(cyl6);
+        sphere4.add(cyl6);
+        cyl6.rotation.z = -0.3;
+        cyl6.position.x = 0.75;
+        cyl6.position.y = 1;
+
+        const sphere5 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 20), arm_mat);
+        scene.add(sphere5);
+        cyl5.add(sphere5);
+        sphere5.position.y = 0.5;
+
+        const sphere6 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 20), arm_mat);
+        scene.add(sphere6);
+        cyl6.add(sphere6);
+        sphere6.position.y = 0.5;
+
+        const cyl7 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 20), hand_mat);
+        scene.add(cyl7);
+        sphere5.add(cyl7);
+        cyl7.rotation.z = -0.7;
+        cyl7.position.x = 0.3;
+        cyl7.position.y = 0.5;
+
+        const cyl8 = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 20), hand_mat);
+        scene.add(cyl8);
+        sphere6.add(cyl8);
+        cyl8.rotation.z = 0.7;
+        cyl8.position.x = -0.3;
+        cyl8.position.y = 0.5;
+
+        const sphere7 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 20), arm_mat);
+        scene.add(sphere7);
+        cyl7.add(sphere7);
+        sphere7.position.y = 0.5;
+
+        const sphere8 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 20), arm_mat);
+        scene.add(sphere8);
+        cyl8.add(sphere8);
+        sphere8.position.y = 0.5;
+
+        const hole = new THREE.Mesh(new THREE.CircleGeometry(0.75, 20), arm_mat);
+        scene.add(hole)
+        hole.position.y = -9.99;
+        hole.position.z = 8;
+        hole.rotation.x = π/2;
+
+
+
+        const geometry = new THREE.SphereGeometry(0.1, 20, 20);
+
+        function rand(min, max) {
+            if (max === undefined) {
+                max = min;
+                min = 0;
+            }
+            return min + (max - min) * Math.random();
+        }
+
+        function randomColor() {
+            return `hsl(${rand(360) | 0}, ${rand(50, 100) | 0}%, 50%)`;
+        }
+
+        const numObjects = 20;
+        for (let i = 0; i < numObjects; ++i) {
+            const material = new THREE.MeshPhongMaterial({
+                color: randomColor(),
+            });
+
+            const cube = new THREE.Mesh(geometry, material);
+            scene.add(cube);
+
+            cube.position.set(rand(-9, 9), -9.5, rand(-9, 9));
+            cube.rotation.set(rand(Math.PI), rand(Math.PI), 0);
+            cube.scale.set(rand(3, 6), rand(3, 6), rand(3, 6));
+        }
+
+        function resizeRendererToDisplaySize(renderer) {
+            const canvas = renderer.domElement;
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            const needResize = canvas.width !== width || canvas.height !== height;
+            if (needResize) {
+                renderer.setSize(width, height, false);
+            }
+            return needResize;
+        }
+
+        class PickHelper {
+            constructor() {
+                this.raycaster = new THREE.Raycaster();
+                this.pickedObject = null;
+                this.pickedObjectSavedColor = 0;
+            }
+            pick(normalizedPosition, scene, camera) {
+                // restore the color if there is a picked object
+                if (this.pickedObject) {
+                    this.pickedObject.material.emissive.setHex(this.pickedObjectSavedColor);
+                    this.pickedObject = undefined;
+                }
+
+                // cast a ray through the frustum
+                this.raycaster.setFromCamera(normalizedPosition, camera);
+                // get the list of objects the ray intersected
+                const intersectedObjects = this.raycaster.intersectObjects(scene.children);
+                if (intersectedObjects.length) {
+                    // pick the first object. It's the closest one
+                    this.pickedObject = intersectedObjects[0].object;
+                    // save its color
+                    this.pickedObjectSavedColor = this.pickedObject.material.emissive.getHex();
+                    // set its emissive color to flashing red/yellow
+                    this.pickedObject.material.emissive.setHex(0xFF0000);
+                }
+            }
+        }
+
+        const pickPosition = { x: 0, y: 0 };
+        const pickHelper = new PickHelper();
+        clearPickPosition();
+
+        // var pursuit = false;
+        // var dest = {
+        //         rot_0: 0,
+        //     };
+
+        var pursuit = false;
+        var retreat = false;
+        var dest = {
+                rot_0: new THREE.Quaternion(),
+            };
+        var pick;
+
+        // function findGoal() {
+        //     const pos = pickHelper.pickedObject.position;
+        //     return {
+        //         rot_0: Math.atan(pos.z / pos.x),
+        //     };
+        // }
+
+        // function moveRobot() { // there's something wrong with the lower left corner that doesn't allow it to go to this loop
+        //     if ( Math.abs(cyl.rotation.y % (2 * π) - dest.rot_0 % (2 * π)) < 0.1 ) {
+        //         cyl.rotation.y = dest.rot_0;
+        //         pursuit = false;
+        //     }
+        //     else { // this isn't thought through enough, think about the 360-0 case
+        //         if ( Math.abs(cyl.rotation.y - dest.rot_0) < 2 * π + cyl.rotation.y - dest.rot_0 ) {
+        //             cyl.rotation.y += 0.09;
+        //         }
+        //         // if ( Math.abs(cyl.rotation.y - dest.rot_0) < 1 ) {
+        //         //     cyl.rotation.y += 0.01;
+        //         // }
+        //         else {
+        //             cyl.rotation.y -= 0.09;
+        //         }
+        //     }
+        // }
+
+        function grab() {
+            cyl.quaternion.rotateTowards(dest.rot_0,0.1);
+            const pos = sphere3.getWorldPosition();
+            const pos2 = sphere4.getWorldPosition();
+            const pos3 = sphere8.getWorldPosition();
+            const dist = pos.distanceTo(pick.position);
+            const dist2 = pos2.distanceTo(pick.position);
+            const dist3 = pos3.distanceTo(pick.position);
+
+            if ( dist > 9.2) {
+                sphere2.rotation.x += 0.05;
+                if ( pos2.y < 1) {
+                    sphere3.rotation.x -= 0.1;
+                }
+            }
+            else if ( dist < 8.8) {
+                sphere2.rotation.x -= 0.05;
+            }
+            else if ( !cyl.quaternion.equals(dest.rot_0)) {
+                cyl.quaternion.rotateTowards(dest.rot_0,0.05);
+            }
+            else if ( dist2 > 2.75) {
+                sphere3.rotation.x += 0.05;
+            }
+            else if ( dist3 > 0.75) {
+                sphere4.rotation.x += 0.05;
+            }
+            else {
+                pursuit = false;
+                retreat = true;
+                sphere8.attach(pick);
+            }
+        }
+
+        function release() {
+            var angle = new THREE.Quaternion();
+            angle.setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0);
+            cyl.quaternion.rotateTowards(angle,0.1);
+            const pos = sphere3.getWorldPosition();
+            const pos2 = sphere4.getWorldPosition();
+            const pos3 = sphere8.getWorldPosition();
+            const dist = pos.distanceTo(hole.position);
+            const dist2 = pos2.distanceTo(hole.position);
+            const dist3 = pos3.distanceTo(hole.position);
+
+            if ( dist > 9.2) {
+                sphere2.rotation.x += 0.05;
+                if ( pos2.y < 1) {
+                    sphere3.rotation.x -= 0.1;
+                }
+            }
+            else if ( dist < 8.8) {
+                sphere2.rotation.x -= 0.05;
+            }
+            else if ( !cyl.quaternion.equals(angle)) {
+                cyl.quaternion.rotateTowards(angle,0.05);
+            }
+            else if ( dist2 > 2.75) {
+                sphere3.rotation.x += 0.05;
+            }
+            else if ( dist3 > 0.75) {
+                sphere4.rotation.x += 0.05;
+            }
+            else {
+                retreat = false;
+                sphere8.clear();
+            }
+        }
+
+        // function moveRobot() {
+        //     clearPickPosition();
+        // }
+
+        function render() {
+
+            if (resizeRendererToDisplaySize(renderer)) {
+                const canvas = renderer.domElement;
+                camera.aspect = canvas.clientWidth / canvas.clientHeight;
+                camera.updateProjectionMatrix();
+            }
+
+            pickHelper.pick(pickPosition, scene, camera);
+
+            if (pursuit) {
+                grab();
+            }
+
+            if (retreat) {
+                release();
+            }
+
+            renderer.render(scene, camera);
+
+            renderer.setAnimationLoop( render );
+
+            controls.update();
+        }
+        requestAnimationFrame(render);
+
+        function getCanvasRelativePosition(event) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: (event.clientX - rect.left) * canvas.width / rect.width,
+                y: (event.clientY - rect.top) * canvas.height / rect.height,
+            };
+        }
+
+        function setPickPosition(event) {
+            const pos = getCanvasRelativePosition(event);
+            pickPosition.x = (pos.x / canvas.width) * 2 - 1;
+            pickPosition.y = (pos.y / canvas.height) * -2 + 1;  // note we flip Y
+        }
+
+        function clearPickPosition() {
+            // unlike the mouse which always has a position
+            // if the user stops touching the screen we want
+            // to stop picking. For now we just pick a value
+            // unlikely to pick something
+            pickPosition.x = -100000;
+            pickPosition.y = -100000;
+        }
+
+        // function beginPursuit() {
+        //     pursuit = true;
+        //     pickHelper.pick(pickPosition, scene, camera);
+        //     const pos = pickHelper.pickedObject.position;
+        //     if (pos.z > 0) {
+        //         dest.rot_0 = Math.atan(pos.x / pos.z);
+        //     }
+        //     else {
+        //         dest.rot_0 = π + Math.atan(pos.x / pos.z);
+        //     }
+        // }
+
+        function beginPursuit() {
+            if (pickHelper.raycaster.intersectObjects.length && pursuit == false && retreat == false) {
+                if (pickHelper.pickedObject.position.y == -9.5) {
+                    pursuit = true;
+                    pickHelper.pick(pickPosition, scene, camera);
+                    pick = pickHelper.pickedObject;
+
+                    // angle to face the ball
+                    var angle = 0;
+                    if (pick.position.z > 0) {
+                        angle = Math.atan(pick.position.x / pick.position.z);
+                    }
+                    else {
+                        angle = π + Math.atan(pick.position.x / pick.position.z);
+                    }
+                    dest.rot_0.setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
+                }
+            }
+            //dest.rot_1.setFromAxisAngle( new THREE.Vector3( 1, 0, 0 ), angle );
+
+            // // angle to position cyl2 correctly
+            // var arm_pos = new THREE.Vector3(0,0,0);
+            // sphere2.getWorldPosition(arm_pos);
+            // var x_dist = Math.pow(Math.pow(arm_pos.x,2)+Math.pow(pos.x,2),0.5);
+            // var z_dist = Math.pow(Math.pow(arm_pos.z,2)+Math.pow(pos.z,2),0.5);
+            // var horz = Math.pow(Math.pow(x_dist,2)+Math.pow(z_dist,2),0.5);
+            // var vert = Math.pow(Math.pow(arm_pos.y,2)+Math.pow(pos.y,2),0.5);
+            // var ball_dist = Math.pow(Math.pow(horz,2)+Math.pow(vert,2),0.5);
+
+            // h1 = 6; // height of cyl2
+            // h2 = 8; // height of cyl3
+            // alpha = Math.atan(-vert / horz);
+            // inner = - (Math.pow(h2,2) - Math.pow(h1,2) - Math.pow(horz,2) - Math.pow(vert,2)) / (2 * h1 * ball_dist);
+            // angle = Math.asin(inner) - alpha;
+            // //angle += 0.5; possible adjustment needed
+            // dest.rot_1.setFromAxisAngle( new THREE.Vector3( 1, 0, 0 ), angle );
+
+
+
+        }
+
+        window.addEventListener('mousemove', setPickPosition);
+        window.addEventListener('mouseout', clearPickPosition);
+        window.addEventListener('mouseleave', clearPickPosition);
+        window.addEventListener('click', beginPursuit);
+
+        window.addEventListener('touchstart', (event) => {
+            // prevent the window from scrolling
+            event.preventDefault();
+            setPickPosition(event.touches[0]);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (event) => {
+            setPickPosition(event.touches[0]);
+        });
+
+        window.addEventListener('touchend', clearPickPosition);
+    }
+
+    main();
+</script>
+
+</html>

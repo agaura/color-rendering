@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <!-- D3.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/6.7.0/d3.min.js" charset="utf-8"></script>
+
+    <script src="https://d3js.org/d3-array.v2.min.js"></script>
+    <script src="https://d3js.org/d3-geo.v2.min.js"></script>
+    <script src="https://d3js.org/d3-geo-projection.v3.min.js"></script>
+    <script src="https://unpkg.com/d3-simple-slider"></script>
+
+    <!-- topojson -->
+    <script src="https://unpkg.com/topojson@3"></script>
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400" rel='stylesheet' type='text/css'>
+
+    <style>
+        body {
+            font-size: 10px;
+            font-family: 'Open Sans', sans-serif;
+            font-weight: 400;
+            fill: #8C8C8C;
+            text-align: center;
+            background: #191919;
+        }
+
+        .title {
+            font-size: 26px;
+            fill: #C4C4C4;
+            font-weight: 300;
+            text-anchor: start;
+        }
+
+        .axis path,
+        .axis tick,
+        .axis line {
+            fill: none;
+            stroke: #AAAAAA;
+            shape-rendering: geometricPrecision;
+        }
+
+        .axis text {
+            font-size: 12px;
+            fill: #AAAAAA;
+            font-weight: 400;
+        }
+
+        div.tooltip {
+            position: absolute;
+            text-align: center;
+            width: 210px;
+            height: 42px;
+            padding: 2px;
+            font: 12px sans-serif;
+            background: lightsteelblue;
+            border: 0px;
+            border-radius: 8px;
+            pointer-events: none;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div id="svg"></div>
+
+    <div class="row align-items-center">
+        <div class="col-sm-2">
+            <p id="value-time"></p>
+        </div>
+        <div class="col-sm">
+            <div id="slider-time"></div>
+        </div>
+    </div>
+
+    <script>
+
+        // Define the div for the tooltip
+        var div = d3.select("body").append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0);
+
+
+        d3.text("./temp_data2.tsv").then(function (text) {
+
+            var countryList = [];
+            var temps = [];
+
+            var climateData = d3.csvParseRows(text, function (d) {
+                var temp = d[0].split('   ').slice(0, 6);
+                temp[0] = temp[0].substring(1);
+                countryList.push(temp[0]);
+                temp[1] = parseInt(temp[1]);
+                temp[2] = parseFloat(temp[2]);
+                temp[3] = parseFloat(temp[3]);
+                temp[4] = parseFloat(temp[4]);
+                temp[5] = parseFloat(temp[5]);
+                temps.push(temp[4]);
+                return temp;
+            });
+
+            var minTemp = Math.min(...temps);
+            var maxTemp = Math.max(...temps);
+            maxTemp = Math.max(Math.abs(minTemp),Math.abs(maxTemp));
+            minTemp = - maxTemp;
+            var tempRange = maxTemp - minTemp;
+
+            var year = 1901;
+
+            var margin = {
+                top: -50,
+                right: 20,
+                bottom: 120,
+                left: 20
+            };
+
+            var w = window.innerWidth - margin.left - margin.right - 20;
+            var h = window.innerHeight / 1.1;
+
+            colors = ["#67001f", "#6a011f", "#6d0220", "#700320", "#730421", "#760521", "#790622", "#7b0722", "#7e0823", "#810923", "#840a24", "#870b24", "#8a0c25", "#8c0d26", "#8f0f26", "#921027", "#941127", "#971228", "#9a1429", "#9c1529", "#9f172a", "#a1182b", "#a41a2c", "#a61c2d", "#a81d2d", "#aa1f2e", "#ad212f", "#af2330", "#b12531", "#b32732", "#b52933", "#b72b34", "#b82e35", "#ba3036", "#bc3238", "#be3539", "#bf373a", "#c13a3b", "#c33c3d", "#c43f3e", "#c6413f", "#c74441", "#c94742", "#ca4943", "#cc4c45", "#cd4f46", "#ce5248", "#d0544a", "#d1574b", "#d25a4d", "#d45d4e", "#d56050", "#d66252", "#d86554", "#d96855", "#da6b57", "#db6d59", "#dd705b", "#de735d", "#df755f", "#e07861", "#e17b63", "#e27d65", "#e48067", "#e58369", "#e6856b", "#e7886d", "#e88b6f", "#e98d71", "#ea9073", "#eb9276", "#ec9578", "#ed977a", "#ee9a7c", "#ee9c7f", "#ef9f81", "#f0a183", "#f1a486", "#f2a688", "#f2a88b", "#f3ab8d", "#f4ad90", "#f4af92", "#f5b295", "#f5b497", "#f6b69a", "#f6b89c", "#f7ba9f", "#f7bda1", "#f8bfa4", "#f8c1a6", "#f8c3a9", "#f9c5ab", "#f9c7ae", "#f9c9b0", "#facab3", "#faccb5", "#faceb8", "#fad0ba", "#fad2bc", "#fad3bf", "#fad5c1", "#fbd7c4", "#fbd8c6", "#fbdac8", "#fbdbca", "#fbddcc", "#fadecf", "#fae0d1", "#fae1d3", "#fae2d5", "#fae3d7", "#fae5d8", "#fae6da", "#f9e7dc", "#f9e8de", "#f9e9e0", "#f8eae1", "#f8eae3", "#f7ebe4", "#f7ece6", "#f6ede7", "#f6ede8", "#f5eee9", "#f4eeeb", "#f4efec", "#f3efed", "#f2efed", "#f1efee", "#f0f0ef", "#eff0f0", "#eef0f0", "#edf0f1", "#eceff1", "#ebeff1", "#eaeff2", "#e9eff2", "#e7eef2", "#e6eef2", "#e5edf2", "#e3edf2", "#e2ecf2", "#e0ecf2", "#dfebf2", "#ddeaf2", "#dbeaf1", "#dae9f1", "#d8e8f1", "#d6e7f0", "#d4e6f0", "#d3e6f0", "#d1e5ef", "#cfe4ef", "#cde3ee", "#cbe2ee", "#c9e1ed", "#c7e0ed", "#c5dfec", "#c2ddec", "#c0dceb", "#bedbea", "#bcdaea", "#bad9e9", "#b7d8e8", "#b5d7e8", "#b2d5e7", "#b0d4e6", "#aed3e6", "#abd1e5", "#a9d0e4", "#a6cfe3", "#a3cde3", "#a1cce2", "#9ecae1", "#9cc9e0", "#99c7e0", "#96c6df", "#93c4de", "#91c3dd", "#8ec1dc", "#8bc0db", "#88beda", "#85bcd9", "#83bbd8", "#80b9d7", "#7db7d7", "#7ab5d6", "#77b3d5", "#74b2d4", "#71b0d3", "#6faed2", "#6cacd1", "#69aad0", "#66a8cf", "#64a7ce", "#61a5cd", "#5ea3cc", "#5ba1cb", "#599fca", "#569dc9", "#549bc8", "#5199c7", "#4f98c6", "#4d96c5", "#4b94c4", "#4892c3", "#4690c2", "#448ec1", "#428cc0", "#408bbf", "#3e89be", "#3d87bd", "#3b85bc", "#3983bb", "#3781ba", "#3680b9", "#347eb7", "#337cb6", "#317ab5", "#3078b4", "#2e76b2", "#2d75b1", "#2c73b0", "#2a71ae", "#296fad", "#286dab", "#266baa", "#2569a8", "#2467a6", "#2365a4", "#2164a2", "#2062a0", "#1f609e", "#1e5e9c", "#1d5c9a", "#1b5a98", "#1a5895", "#195693", "#185490", "#17528e", "#164f8b", "#154d89", "#134b86", "#124983", "#114781", "#10457e", "#0f437b", "#0e4178", "#0d3f75", "#0c3d73", "#0a3b70", "#09386d", "#08366a", "#073467", "#063264", "#053061"];
+
+            var svg = d3.select("#svg")
+                .append("svg")
+                .attr("width", w + margin.left + margin.right)
+                .attr("height", window.innerHeight - 200)
+                .append("g")
+                .attr("transform", "translate(" + (-margin.left + w / 4) + "," + (margin.top + h / 4) + ")");
+
+            var textWrapper = svg.append("g").attr("class", "textWrapper")
+                .attr("transform", "translate(" + 300 + "," + -85 + ")");
+
+            //Append title to the top
+            textWrapper.append("text")
+                .attr("class", "title")
+                .attr("x", 0)
+                .attr("y", 0)
+                .text("Global Temperature Deviations");
+
+            const projection = d3.geoEquirectangular().scale(200);
+            const pathGenerator = d3.geoPath().projection(projection);
+
+            d3.json('https://unpkg.com/world-atlas@2.0.2/countries-50m.json').then(data => {
+                const countries = topojson.feature(data, data.objects.countries);
+
+                var onElement = false;
+
+                const paths = svg.selectAll('path')
+                    .data(countries.features)
+                    .enter()
+                    .append('path')
+                    .style("stroke", "#00000055")
+                    .on("mouseover", d => {
+                        d3.select(d.target)
+                            .transition()
+                            .duration(100)
+                            .style("opacity", d => {
+
+                                // this thing should probably not be happening within this particular function, but it works great
+
+                                if (countryList.includes(d.properties.name)) {
+                                    onElement = true;
+
+                                    var yearInd = year - 1901;
+                                    var ind = countryList.indexOf(d.properties.name) + yearInd;
+
+                                    div.html(d.properties.name + "<br/>"
+                                        + "Avg. Temp. in " + year + ": " + climateData[ind][2].toFixed(2) + "°C" + "<br/>"
+                                        + "Deviation from 120-Year Avg.: " + climateData[ind][4].toFixed(2) + "°C");
+                                }
+
+                                // this is the only thing that is actually contributing to the opacity
+                                return 0.8
+                            })
+                            .style("stroke", "#000000");
+                    })
+                    .on("mousemove", d => {
+                        if (onElement) {
+                            div.transition()
+                                .duration(100)
+                                .style("opacity", .9)
+                                .style("left", (event.pageX) + "px")
+                                .style("top", (event.pageY) + "px");
+                        }
+                    })
+                    .on("mouseleave", () => {
+                        onElement = false;
+                        div.style("opacity", 0);
+
+                        d3.selectAll("path")
+                            .transition()
+                            .duration(100)
+                            .style("opacity", 1)
+                            .style("stroke", "#00000055");
+                    })
+                    .attr("fill", d => {
+                        var yearInd = 0;
+                        var color = '#000000'
+                        if (countryList.includes(d.properties.name)) {
+                            var ind = countryList.indexOf(d.properties.name) + yearInd;
+                            var temp = climateData[ind][4] - minTemp;
+                            color = colors[colors.length - Math.floor(temp / tempRange * colors.length)];
+                        }
+
+                        return color;
+                    })
+                    .attr('d', pathGenerator);
+
+                // Time
+                var dataTime = d3.range(0, 120).map(function (d) {
+                    return new Date(1901 + d, 1, 1);
+                });
+
+                var ticks = d3.range(0, 120, 10).map(function (d) {
+                    return new Date(1905 + d, 1, 1);
+                });
+
+                var sliderTime = d3
+                    .sliderBottom()
+                    .min(d3.min(dataTime))
+                    .max(d3.max(dataTime))
+                    .step(1000 * 60 * 60 * 24 * 365)
+                    .width(1000)
+                    .tickFormat(d3.timeFormat('%Y'))
+                    .tickValues(ticks)
+                    .default(new Date(1901, 01, 01))
+                    .on('onchange', val => {
+                        paths.attr("fill", d => {
+                            year = Math.floor(val.getFullYear());
+                            var yearInd = year - 1901;
+                            var color = '#000000'
+                            if (countryList.includes(d.properties.name)) {
+                                var ind = countryList.indexOf(d.properties.name) + yearInd;
+                                var temp = climateData[ind][4] - minTemp;
+                                color = colors[colors.length - Math.floor(temp / tempRange * colors.length)];
+                            };
+
+                            return color;
+                        });
+                    });
+
+                var gTime = d3
+                    .select('div#slider-time')
+                    .append('svg')
+                    .attr('width', 1100)
+                    .attr('height', 100)
+                    .append('g')
+                    .attr('transform', 'translate(30,30)');
+
+                gTime.call(sliderTime);
+
+                //Calculate the gradient	
+                var defs = svg.append("defs");
+                
+                defs.append("linearGradient")
+                    .attr("id", "gradient")
+                    .attr("x1", "0%").attr("y1", "0%")
+                    .attr("x2", "0%").attr("y2", "100%")
+                    .selectAll("stop")
+                    .data(colors)
+                    .enter().append("stop")
+                    .attr("offset", function (d, i) { return i / (colors.length - 1); })
+                    .attr("stop-color", function (d) { return d; });
+
+                var width = 600;
+                var height = 50;
+
+                var legendWidth = width * 0.6,
+                    legendHeight = 10;
+
+                //Color Legend container
+                var legendsvg = svg.append("g")
+                    .attr("class", "legendWrapper")
+                    .attr("transform", "translate(" + (width / 2 - 350) + "," + (height + 50) + ")");
+
+                //Draw the Rectangle
+                legendsvg.append("rect")
+                    .attr("class", "legendRect")
+                    .attr("x", -legendWidth / 2)
+                    .attr("y", 20)
+                    .attr("width", 15)
+                    .attr("height", legendWidth)
+                    .style("fill", "url(#gradient)");
+
+                //Append title
+                legendsvg.append("text")
+                    .attr("class", "legendTitle")
+                    .attr("x", 0)
+                    .attr("y", -2)
+
+                //Set scale for x-axis
+                var xScale = d3.scaleLinear()
+                    .range([legendWidth, 0])
+                    .domain([minTemp, maxTemp]);
+
+                //Define x-axis
+                var xAxis = d3.axisLeft(xScale)
+                    .ticks(10)  //Set rough # of ticks
+                    .tickFormat(function(d) { return d + "°C"; });
+
+                //Set up X axis
+                legendsvg.append("g")
+                    .attr("class", "axis")  //Assign "axis" class
+                    .attr("transform", "translate(" + (-legendWidth / 2) + "," + (10 + legendHeight) + ")")
+                    .call(xAxis);
+            })
+        })
+
+    </script>
+
+</body>
+
+</html>

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+
+            margin: 0;
+            overflow: hidden;
+            background-color: #AAAAAA;
+            background-attachment: fixed !important;
+        }
+    </style>
+    <style>
+        body {
+            font-family: Monospace;
+            margin: 0px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+    <div id='timer'></div>
+
+    <script id="gaussVertShader" type="shader">
+        varying vec2 vUv;
+        void main() {
+            vUv = vec2( uv.x, 1.0-uv.y );
+            gl_Position = projectionMatrix *
+                          modelViewMatrix * vec4(position, 1.0 );
+        }
+        </script>
+
+    <script id="gaussFragShader" type="shader">
+        precision highp float;
+        uniform sampler2D image;
+        uniform vec2 resolution;
+        uniform float sigma;
+        uniform int size;
+        uniform bool dim;
+        
+        varying vec2 vUv;
+        
+        float gauss(int x) {
+            float coef = 1.0 / (sqrt(2.0 * 3.14159) * sigma);
+            float funcx = exp( - pow(float(x), 2.0) / (2.0 * pow(sigma, 2.0)));
+            return coef * funcx;
+        }
+        
+        void main(void) {
+                        vec2 cellSize = 1.0 / resolution.xy;
+                        vec2 uv = vUv.xy;
+                        vec3 temp = vec3(0.0);
+                        for (int i = - size; i <= size; i++) {temp += 
+                            texture2D(image, uv + vec2(float(dim)*float(i)*cellSize.x, float(!dim)*float(i)*cellSize.y)).rgb*gauss(i);}
+                        gl_FragColor = vec4(temp, 1.0);
+                }
+        </script>
+
+    <script type="text/javascript" src="http://lo-th.github.io/uil/build/uil.js"></script>
+    <script type="module">
+        
+        import * as THREE from 'https://cdn.skypack.dev/three@0.125.0';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.125.0/examples/jsm/controls/OrbitControls.js';
+        import { GUI } from 'https://cdn.skypack.dev/three@0.125.0/examples/jsm/libs/dat.gui.module.js';
+
+        function IVimageProcessing(height, width, imageProcessingMaterial) {
+            this.height = height;
+            this.width = width;
+
+            //3 rtt setup
+            this.scene = new THREE.Scene();
+            this.orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1 / Math.pow(2, 53), 1);
+
+            //4 create a target texture
+            var options = {
+                minFilter: THREE.NearestFilter,
+                magFilter: THREE.NearestFilter,
+                format: THREE.RGBAFormat,
+                //            type:THREE.FloatType
+                type: THREE.UnsignedByteType
+            };
+            this.rtt = new THREE.WebGLRenderTarget(width, height, options);
+
+            var geom = new THREE.BufferGeometry();
+            geom.addAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
+            geom.addAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0]), 2));
+            this.scene.add(new THREE.Mesh(geom, imageProcessingMaterial));
+        }
+
+        function IVprocess(imageProcessing, renderer) {
+            renderer.setRenderTarget(imageProcessing.rtt);
+            renderer.render(imageProcessing.scene, imageProcessing.orthoCamera);
+            renderer.setRenderTarget(null);
+        };
+
+        var camera, controls, scene, renderer, container;
+        var plane, plane2;
+
+        // VIDEO AND THE ASSOCIATED TEXTURE
+        var srcTexture;
+        var h, w;
+        var texType;
+
+        var imageProcessing, imageProcessingMaterial,
+            imageProcessing2, imageProcessingMaterial2;
+
+        // GUI
+        var gui, ui;
+        var timing;
+        var clock = new THREE.Clock();
+        var ptime;
+        var selectorVal;
+
+        init();
+        animate();
+
+        function init() {
+            timing = false;
+
+            container = document.createElement('div');
+            document.body.appendChild(container);
+
+            scene = new THREE.Scene();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.autoClear = false;
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = false;
+
+            container.appendChild(renderer.domElement);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.001, 10);
+            camera.position.z = 0.7;
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.minDistance = 0.005;
+            controls.maxDistance = 1.0;
+            controls.enableRotate = true;
+            controls.addEventListener('change', render);
+            controls.update();
+
+            var thisurl = window.location.href;
+            var strarray = thisurl.split("=");
+            texType = strarray[strarray.length - 1];
+
+            if (texType == 'webcam') {
+                selectorVal = 'Webcam';
+
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    const constraints = { video: { width: 1280, height: 720, facingMode: 'user' } };
+                    navigator.mediaDevices.getUserMedia(constraints).then(function (stream) {
+                        var video = document.createElement('video');
+                        video.srcObject = stream;
+                        video.play();
+
+                        video.onloadeddata = function () {
+                            srcTexture = new THREE.VideoTexture(video);
+
+                            h = video.videoHeight;
+                            w = video.videoWidth;
+
+                            initTex();
+
+                        };
+
+                    })
+                }
+
+            }
+
+            else if (texType == 'image') {
+                selectorVal = 'Image';
+
+                var loader = new THREE.TextureLoader();
+                loader.load("grenouille.jpg", function (tex) {
+                    h = tex.image.height;
+                    w = tex.image.width;
+
+                    srcTexture = tex;
+
+                    initTex();
+
+                });
+
+            }
+
+            else {
+                selectorVal = 'Video';
+
+                var video = document.createElement('video');
+                video.src = 'small.mp4';
+                video.load();
+                video.muted = true;
+                video.loop = true;
+
+                video.onloadeddata = function () {
+                    srcTexture = new THREE.VideoTexture(video);
+
+                    h = video.videoHeight;
+                    w = video.videoWidth;
+
+                    initTex();
+
+                    video.play();
+                };
+            }
+
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function initTex() {
+            srcTexture.minFilter = THREE.NearestFilter;
+            srcTexture.magFilter = THREE.NearestFilter;
+            srcTexture.generateMipmaps = false;
+            srcTexture.format = THREE.RGBFormat;
+
+            imageProcessingMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        image: { type: 't', value: srcTexture },
+                        resolution: { type: '2f', value: new THREE.Vector2(w, h) },
+                        sigma: { type: 'f', value: 1.0 },
+                        size: { type: 'i', value: 2 },
+                        dim: { type: 'b', value: false }
+                    },
+                    vertexShader: document.
+                        getElementById('gaussVertShader').text,
+                    fragmentShader: document.
+                        getElementById('gaussFragShader').text,
+                });
+
+                imageProcessing = new IVimageProcessing(h, w, imageProcessingMaterial);
+
+                imageProcessingMaterial2 = new THREE.ShaderMaterial({
+                    uniforms: {
+                        image: { type: 't', value: imageProcessing.rtt.texture },
+                        resolution: { type: '2f', value: new THREE.Vector2(w, h) },
+                        sigma: { type: 'f', value: 1.0 },
+                        size: { type: 'i', value: 2 },
+                        dim: { type: 'b', value: true }
+                    },
+                    vertexShader: document.
+                        getElementById('gaussVertShader').text,
+                    fragmentShader: document.
+                        getElementById('gaussFragShader').text,
+                });
+
+                imageProcessing2 = new IVimageProcessing(h, w, imageProcessingMaterial2);
+
+            var geometry = new THREE.PlaneGeometry(1, h / w);
+            var material = new THREE.MeshBasicMaterial({ map: imageProcessing2.rtt.texture, side: THREE.DoubleSide });
+            plane = new THREE.Mesh(geometry, material);
+            plane.receiveShadow = false;
+            plane.castShadow = false;
+            plane.position.z = -0.8;
+            if (texType == 'webcam') { plane.rotation.y = Math.PI; }
+            scene.add(plane);
+
+            var geometry2 = new THREE.PlaneGeometry(1, h / w);
+            var material2 = new THREE.MeshBasicMaterial({ map: srcTexture, side: THREE.DoubleSide });
+            plane2 = new THREE.Mesh(geometry2, material2);
+            plane2.position.z = -1;
+            plane2.position.y = -0.5;
+            plane2.receiveShadow = false;
+            plane2.castShadow = false;
+            if (texType == 'webcam') { plane2.rotation.y = Math.PI; }
+            scene.add(plane2);
+
+            var timer = document.getElementById('timer');
+
+            ui = new UIL.Gui({ w: 350, h: 20, close: false });
+            ui.add('bool', { name: 'Processing', h: 20, value: false }).onChange(function () {
+                    if (timing) { timer.innerHTML = ''; }
+                    timing = !timing;
+                });
+                ui.add('slide', { name: 'Size', min: 0, max: 100, precision: 0, value: 2 }).onChange(function (p) { imageProcessingMaterial.uniforms.size.value = p; imageProcessingMaterial2.uniforms.size.value = p;});
+                ui.add('slide', { name: 'Sigma', min: 0, max: 50, precision: 2, value: 1 }).onChange(function (p) { imageProcessingMaterial.uniforms.sigma.value = p; imageProcessingMaterial2.uniforms.sigma.value = p;});
+            ui.add('selector', { name: 'Source', value: selectorVal, values: ['Image', 'Video', 'Webcam'] }).onChange(function (p) {
+                var currenturl = window.location.href.split("separable.html")[0];
+                if (p == 'Image') { window.location.replace(currenturl + "separable.html?sourceimage=image"); }
+                else if (p == 'Video') { window.location.replace(currenturl + "separable.html?sourceimage=video"); }
+                else { window.location.replace(currenturl + "separable.html?sourceimage=webcam"); }
+            });
+        }
+
+        function render() {
+            renderer.clear();
+
+            if (typeof imageProcessing !== 'undefined')
+                IVprocess(imageProcessing, renderer);
+            if (typeof imageProcessing2 !== 'undefined')
+                IVprocess(imageProcessing2, renderer);
+
+            renderer.render(scene, camera);
+
+        }
+
+        function animate() {
+            if (timing) { timer.innerHTML = (100 * clock.getDelta()).toFixed(5) + " ms"; }
+            requestAnimationFrame(animate);
+            controls.update();
+            render();
+        }
+
+        function onWindowResize() {
+            camera.aspect = (window.innerWidth / window.innerHeight);
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            render();
+        }
+
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,1726 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+
+            margin: 0;
+            overflow: hidden;
+            background-color: #282840;
+            background-attachment: fixed !important;
+        }
+    </style>
+    <style>
+        body {
+            font-family: Monospace;
+            margin: 0px;
+            overflow: hidden;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script id="vertShader" type="shader">
+varying vec2 vUv;
+void main() {
+    vUv = vec2( uv.x, 1.0-uv.y );
+    gl_Position = projectionMatrix *
+                  modelViewMatrix * vec4(position, 1.0 );
+}
+</script>
+
+    <script id="fragShader" type="shader">
+precision highp float;
+const int kernelSizeDiv2 = 2;
+uniform sampler2D image;
+uniform vec2 resolution;
+uniform float colorScaleR;
+uniform float colorScaleG;
+uniform float colorScaleB;
+uniform bool invert;
+
+varying vec2 vUv;
+void main(void) {
+				vec2 cellSize = 1.0 / resolution.xy;
+				vec2 uv = vUv.xy;
+
+				vec4 textureValue = vec4 ( 0,0,0,0 );
+				for (int i=-kernelSizeDiv2;i<=kernelSizeDiv2;i++)
+					for (int j=-kernelSizeDiv2;j<=kernelSizeDiv2;j++)
+						textureValue += texture2D( image, uv + vec2( float(i)*cellSize.x, float(j)*cellSize.y ) );
+				textureValue /= float ((kernelSizeDiv2*2+1)*(kernelSizeDiv2*2+1));
+				if (invert)
+				{
+					gl_FragColor = vec4(vec3(colorScaleR,colorScaleG,colorScaleB),1.0)*textureValue;
+					gl_FragColor.rgb = vec3 ( 1.0 ) - gl_FragColor.rgb;
+				}
+				else
+				gl_FragColor = vec4(vec3(colorScaleR,colorScaleG,colorScaleB),1.0)*textureValue;
+		}
+</script>
+
+    <!-- <script type="x-shader/x-vertex" id="basicvertexshader">
+    varying vec2 vUv;
+    uniform float scaleElevation; 
+    uniform vec2 stepPixel;
+    uniform sampler2D tex;
+
+    void main() {
+        vUv = uv;
+        vec3 color = texture2D ( tex, vUv ).rgb;
+        float l = length ( color );
+        vec3 tmp = position;
+        tmp.z = tmp.z + l*scaleElevation;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(tmp, 1.0);
+    }
+</script>
+
+    <script type="x-shader/x-fragment" id="basicfragmentshader">
+    varying vec2 vUv;
+    uniform sampler2D tex;
+
+    void main() {
+        vec3 color = texture2D ( tex, vUv ).rgb;
+        gl_FragColor.rgb = color;
+        gl_FragColor.a = 1.0;
+    }
+</script> -->
+
+    <script type="x-shader/x-vertex" id="curvevertexshader">
+    varying vec2 vUv;
+    uniform float scale;
+    
+    void main() {
+        vUv = uv;
+        //zp = position.z + pow((position.x - 0.5)*2.0, 2.0) + pow((position.y - 0.5)*2.0, 2.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x, position.y, scale*(position.z+pow(position.x,2.0)+pow(0.0*position.y,2.0))/1.5, 1.0);
+    }
+</script>
+
+    <script type="x-shader/x-fragment" id="curvefragmentshader">
+    varying vec2 vUv;
+    uniform sampler2D tex;
+
+    void main() {
+        gl_FragColor.rgb = texture2D ( tex, vUv ).rgb;
+        gl_FragColor.a = 1.0;
+    }
+</script>
+
+    <script type="x-shader/x-vertex" id="lightvertexshader">
+    uniform float discret; 
+    uniform float scaleElevation; 
+    uniform vec2 stepPixel;
+    uniform vec3 lightDir;
+    uniform float lightIntensity;
+    uniform sampler2D tex;
+    varying vec2 vUv;
+    varying float NdotL;
+    uniform int colorLabel;
+    uniform int axisLabel;
+
+
+    vec3 RGBtoXYZ(vec3 shade) {
+        mat3 conversion = mat3( 0.4497288 , 0.3162486 , 0.1844926,
+        0.2446525 , 0.6720283 , 0.0833192,
+        0.0251848 , 0.1411824 , 0.9224628); // Apple RGB conversion matrix
+        return conversion * shade;
+    }
+
+    vec3 XYZtoLab(vec3 shade) {
+        vec3 d65_ref = vec3(0.9504, 1.0000, 1.0888); // this reference was used for the XYZ conversion
+        vec3 xyz_rat = shade / d65_ref;
+        float epsilon = 0.008856;
+        float kappa = 903.3;
+        vec3 f = vec3(0.0,0.0,0.0);
+        vec3 Lab = vec3(0.0,0.0,0.0);
+
+        if (xyz_rat.x > epsilon) {f.x = pow(xyz_rat.x, 1.0/3.0);}
+        else {f.x = (kappa * xyz_rat.x + 16.0) / 116.0;}
+        if (xyz_rat.y > epsilon) {f.y = pow(xyz_rat.y, 1.0/3.0);}
+        else {f.y = (kappa * xyz_rat.y + 16.0) / 116.0;}
+        if (xyz_rat.z > epsilon) {f.z = pow(xyz_rat.z, 1.0/3.0);}
+        else {f.z = (kappa * xyz_rat.z + 16.0) / 116.0;}
+
+        Lab.y = 116.0 * f.y - 16.0;
+        Lab.x = 500.0 * (f.x - f.y);
+        Lab.z = 200.0 * (f.y - f.z);
+
+        Lab = Lab / 100.0;
+
+        return Lab;
+    }
+
+
+    float function ( vec4 color )
+    {
+        return length ( color.rgb );
+    } 
+
+    vec3 convert(vec3 shade, int colorLabel) {
+        if (colorLabel == 0) {return shade;}
+        else if (colorLabel == 1) {return RGBtoXYZ(shade);}
+        else if (colorLabel == 2) {return XYZtoLab(RGBtoXYZ(shade));}
+    }
+
+    void main() {
+        vUv = uv;
+        //float l = function ( texture2D ( tex, vUv ) );
+        //float l = XYZtoLab(RGBtoXYZ(texture2D ( tex, vUv ).rgb)).y;
+        float l = convert(texture2D ( tex, vUv ).rgb, colorLabel)[axisLabel];
+        vec3 tmp = position;
+        tmp.z = tmp.z + l*scaleElevation;
+
+        float diffX = function(texture2D (tex, vUv+vec2 (stepPixel.x*discret,0.0 ) ))-function(texture2D (tex, vUv+vec2 (-stepPixel.x*discret,0.0 ) ));
+        float diffY = function(texture2D (tex, vUv+vec2 (0.0,stepPixel.y*discret ) ))-function(texture2D (tex, vUv+vec2 (0.0,-stepPixel.y*discret ) ));
+        vec3 normal = normalize(cross ( vec3 ( 1.0, 0.0, 6.0*scaleElevation*diffX ),
+                                        vec3 ( 0.0, 1.0, 6.0*scaleElevation*diffY ) ) );
+          NdotL = lightIntensity*(dot(normal, lightDir));
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(tmp, 1.0);
+    }
+</script>
+
+    <script type="x-shader/x-fragment" id="lightfragmentshader">
+    varying vec2 vUv;
+    varying float NdotL;
+
+    uniform sampler2D tex;
+
+    void main() {
+        vec3 color = texture2D ( tex, vUv ).rgb;
+        gl_FragColor.rgb = vec3(NdotL)*color;
+        gl_FragColor.a = 1.0;
+    }
+</script>
+
+    <script type="x-shader/x-vertex" id="RGBVertexShader">
+    uniform sampler2D tex;
+    varying vec3 color;
+    uniform float pointSize;
+    uniform float shadow;
+    uniform int label;
+
+    vec3 RGBtoXYZ(vec3 shade) {
+        mat3 conversion = mat3( 0.4497288 , 0.3162486 , 0.1844926,
+        0.2446525 , 0.6720283 , 0.0833192,
+        0.0251848 , 0.1411824 , 0.9224628); // Apple RGB conversion matrix
+        return conversion * shade;
+    }
+
+    vec3 XYZtoLab(vec3 shade) {
+        vec3 d65_ref = vec3(0.9504, 1.0000, 1.0888); // this reference was used for the XYZ conversion
+        vec3 xyz_rat = shade / d65_ref;
+        float epsilon = 0.008856;
+        float kappa = 903.3;
+        vec3 f = vec3(0.0,0.0,0.0);
+        vec3 Lab = vec3(0.0,0.0,0.0);
+
+        if (xyz_rat.x > epsilon) {f.x = pow(xyz_rat.x, 1.0/3.0);}
+        else {f.x = (kappa * xyz_rat.x + 16.0) / 116.0;}
+        if (xyz_rat.y > epsilon) {f.y = pow(xyz_rat.y, 1.0/3.0);}
+        else {f.y = (kappa * xyz_rat.y + 16.0) / 116.0;}
+        if (xyz_rat.z > epsilon) {f.z = pow(xyz_rat.z, 1.0/3.0);}
+        else {f.z = (kappa * xyz_rat.z + 16.0) / 116.0;}
+
+        Lab.y = 116.0 * f.y - 16.0;
+        Lab.x = -500.0 * (f.x - f.y);
+        Lab.z = -200.0 * (f.y - f.z);
+
+        Lab = Lab / 100.0;
+
+        return Lab;
+    }
+
+    vec3 convert(vec3 shade, int label) {
+        if (label == 0) {return shade;}
+        else if (label == 1) {return RGBtoXYZ(shade);}
+        else if (label == 2) {return XYZtoLab(RGBtoXYZ(shade));}
+    }
+
+    void main() {
+        color = texture2D ( tex, position.xy ).rgb;
+
+        vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 );
+        gl_PointSize = 0.25 * pointSize / -mvPosition.z ;
+
+        vec4 newPosition = vec4(convert(color,label)-vec3(.5,.5,.5), 1.0);
+        newPosition.y = shadow * newPosition.y;
+
+        color = shadow * color;
+
+        gl_Position = projectionMatrix * modelViewMatrix * newPosition;
+    }
+</script>
+
+    <script type="x-shader/x-fragment" id="RGBFragmentShader">
+    varying vec3 color;
+
+    void main() {
+        gl_FragColor.rgb = color;
+        gl_FragColor.a = 1.0;
+    }
+</script>
+
+    <script id="imageVertexShader" type="x-shader/x-vertex">
+    uniform float time;
+    uniform vec2 resolution;
+    varying vec2 vUv;
+    void main()	
+    {  
+        vUv= uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4 (position, 1.0);
+    }
+</script>
+
+    <script id="imageFragmentShader" type="x-shader/x-fragment">
+    uniform float time;
+    uniform vec2 resolution;
+    uniform sampler2D tex;
+    varying vec2 vUv;
+
+    void main()	
+    { 
+        gl_FragColor = texture2D ( tex, vUv );
+    }
+</script>
+
+    <script type="module">
+
+        import * as THREE from 'https://cdn.skypack.dev/three@0.125.0';
+        import { OrbitControls } from 'https://cdn.skypack.dev/three@0.125.0/examples/jsm/controls/OrbitControls.js';
+        import { GUI } from 'https://cdn.skypack.dev/three@0.125.0/examples/jsm/libs/dat.gui.module.js';
+
+
+        function IVimageProcessing(height, width, imageProcessingMaterial) {
+            this.height = height;
+            this.width = width;
+
+            //3 rtt setup
+            this.scene = new THREE.Scene();
+            this.orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1 / Math.pow(2, 53), 1);
+
+            //4 create a target texture
+            var options = {
+                minFilter: THREE.NearestFilter,
+                magFilter: THREE.NearestFilter,
+                format: THREE.RGBAFormat,
+                //            type:THREE.FloatType
+                type: THREE.UnsignedByteType
+            };
+            this.rtt = new THREE.WebGLRenderTarget(width, height, options);
+
+            var geom = new THREE.BufferGeometry();
+            geom.addAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
+            geom.addAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0]), 2));
+            this.scene.add(new THREE.Mesh(geom, imageProcessingMaterial));
+        }
+
+        function IVprocess(imageProcessing, renderer) {
+            renderer.setRenderTarget(imageProcessing.rtt);
+            renderer.render(imageProcessing.scene, imageProcessing.orthoCamera);
+            renderer.setRenderTarget(null);
+        };
+
+        var camera, controls, scene, renderer, container;
+        var plan;
+
+        // VIDEO AND THE ASSOCIATED TEXTURE
+        var video, videoTexture;
+
+        var imageProcessing, imageProcessingMaterial;
+
+        // GUI
+        var gui;
+
+        // buttons
+        var pausePlayBut;
+        var elevationBut;
+        var cloudBut;
+        var compBut;
+        var colorBut;
+        var skipBut;
+        var invertBut;
+        var centerBut;
+        var angleBut;
+        var hideBut;
+        var flattenBut;
+
+        // important objects
+        var plan;
+        var plane;
+        var points;
+        var points2;
+
+        // materials
+        var colorSpaceMaterial;
+        var shadowMaterial;
+        var curveMaterial;
+
+        // icons;
+        var playIcon;
+        var pauseIcon;
+        var RGBIcon;
+        var XYZIcon;
+        var labIcon;
+        var lIcon;
+        var aIcon
+        var bIcon;
+        var rIcon;
+        var gIcon;
+        var blIcon;
+        var xIcon;
+        var yIcon;
+        var zIcon;
+
+        init();
+        animate();
+
+        function init() {
+
+            container = document.createElement('div');
+            document.body.appendChild(container);
+
+            scene = new THREE.Scene();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.autoClear = false;
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = false;
+
+            container.appendChild(renderer.domElement);
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.001, 10);
+            camera.position.z = 0.7;
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.minDistance = 0.005;
+            controls.maxDistance = 1.0;
+            controls.enableRotate = true;
+            controls.addEventListener('change', render);
+            controls.update();
+
+            video = document.createElement('video');
+            video.src = 'small.mp4';
+            video.load();
+            video.muted = true;
+            video.loop = true;
+
+            video.onloadeddata = function () {
+                videoTexture = new THREE.VideoTexture(video);
+                videoTexture.minFilter = THREE.NearestFilter;
+                videoTexture.magFilter = THREE.NearestFilter;
+                videoTexture.generateMipmaps = false;
+                videoTexture.format = THREE.RGBFormat;
+
+                imageProcessingMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        colorScaleR: { type: 'f', value: 1.0 },
+                        colorScaleG: { type: 'f', value: 1.0 },
+                        colorScaleB: { type: 'f', value: 1.0 },
+                        invert: { type: 'b', value: false },
+                        image: { type: 't', value: videoTexture },
+                        resolution: { type: '2f', value: new THREE.Vector2(video.videoWidth, video.videoHeight) }
+                    },
+                    vertexShader: document.
+                        getElementById('vertShader').text,
+                    fragmentShader: document.
+                        getElementById('fragShader').text,
+                });
+
+                imageProcessing = new IVimageProcessing(video.videoHeight, video.videoWidth, imageProcessingMaterial);
+
+                console.log(imageProcessing.width);
+
+                // var geometry = new THREE.PlaneGeometry(1, video.videoHeight / video.videoWidth);
+                // var material = new THREE.MeshBasicMaterial({ map: imageProcessing.rtt.texture, side: THREE.DoubleSide });
+                // plan = new THREE.Mesh(geometry, material);
+                // plan.receiveShadow = false;
+                // plan.castShadow = false;
+                // scene.add(plan);
+                // plan.position.x = 0;
+                // plan.position.z = -0.5;
+
+                var discret = 2;
+
+                curveMaterial = new THREE.ShaderMaterial({
+                    vertexShader: document.querySelector('#curvevertexshader').textContent.trim(),
+                    fragmentShader: document.querySelector('#curvefragmentshader').textContent.trim(),
+                    uniforms: {
+                        tex: { value: imageProcessing.rtt.texture },
+                        scale: { value: 1.0 }
+                    }
+                });
+
+                console.log(imageProcessing.rtt.texture.image.width);
+                console.log(imageProcessing.rtt.texture.image.height);
+                var scale = 1.0;
+                var factor = imageProcessing.rtt.texture.image.height / imageProcessing.rtt.texture.image.width;
+                var planeGeometry = new THREE.PlaneGeometry(scale, scale * factor, imageProcessing.rtt.texture.image.width / discret, imageProcessing.rtt.texture.image.height / discret);
+                plan = new THREE.Mesh(planeGeometry, curveMaterial);
+                plan.material.side = THREE.DoubleSide;
+                plan.position.z = -0.5;
+                plan.rotation.z = Math.PI;
+                plan.rotation.x = Math.PI;
+                plan.rotation.y = Math.PI;
+                scene.add(plan);
+
+                // var geometry2 = new THREE.PlaneGeometry( 1, video.videoHeight/video.videoWidth );
+                // var material2 = new THREE.MeshBasicMaterial( { map: videoTexture, side : THREE.DoubleSide } );
+                // plan = new THREE.Mesh( geometry2, material2 );
+                // plan.position.z = -0.5;
+                // plan.receiveShadow = false;
+                // plan.castShadow = false;
+                // scene.add( plan );
+
+
+                // elevation stuff
+                var scaleElevation = 0.25;
+
+                // var basicElevationMaterial = new THREE.ShaderMaterial({
+                //     vertexShader: document.querySelector('#basicvertexshader').textContent.trim(),
+                //     fragmentShader: document.querySelector('#basicfragmentshader').textContent.trim(),
+                //     uniforms: {
+                //         scaleElevation: { value: scaleElevation },
+                //         tex: { value: imageProcessing.rtt.texture },
+                //     }
+                // });
+
+                var lightDir = new THREE.Vector3(-.5, -.5, .9);
+                lightDir.normalize();
+                console.log(lightDir);
+                var lightIntensity = 1.25;
+
+                var lightElevationMaterial = new THREE.ShaderMaterial({
+                    vertexShader: document.querySelector('#lightvertexshader').textContent.trim(),
+                    fragmentShader: document.querySelector('#lightfragmentshader').textContent.trim(),
+                    uniforms: {
+                        lightDir: { type: '3f', value: lightDir },
+                        lightIntensity: { value: lightIntensity },
+                        discret: { value: 2 },
+                        scaleElevation: { value: scaleElevation },
+                        tex: { value: imageProcessing.rtt.texture },
+                        stepPixel: { type: '2f', value: new THREE.Vector2(1.0 / (imageProcessing.rtt.texture.image.width - 1.0), 1.0 / (imageProcessing.rtt.texture.image.height - 1.0)) },
+                        colorLabel: { value: 2 },
+                        axisLabel: { value: 1 }
+                    }
+                });
+
+                console.log(imageProcessing.rtt.texture.image.width);
+                console.log(imageProcessing.rtt.texture.image.height);
+                //var scale = 1.0;
+                //var factor = imageProcessing.rtt.texture.image.height / imageProcessing.rtt.texture.image.width;
+                //var planeGeometry = new THREE.PlaneGeometry(scale, scale * factor, imageProcessing.rtt.texture.image.width / discret, imageProcessing.rtt.texture.image.height / discret);
+                plane = new THREE.Mesh(planeGeometry, lightElevationMaterial);
+                plane.material.side = THREE.DoubleSide;
+                plane.rotation.z = Math.PI;
+                plane.visible = false;
+
+                scene.add(plane);
+                plane.rotation.x = Math.PI;
+                plane.rotation.y = Math.PI;
+                plane.position.x = 0;
+                plane.position.z = -0.5;
+
+
+
+                // var playMaterial = new THREE.ShaderMaterial({
+                //     uniforms: {
+                //         colorScaleR: { type: 'f', value: 1.0 },
+                //         colorScaleG: { type: 'f', value: 1.0 },
+                //         colorScaleB: { type: 'f', value: 1.0 },
+                //         invert: { type: 'b', value: false },
+                //         image: { type: 't', value: THREE.ImageUtils.loadTexture("play.png") },
+                //         resolution: { type: '2f', value: new THREE.Vector2(video.videoWidth, video.videoHeight) }
+                //     },
+                //     vertexShader: document.
+                //         getElementById('vertShader').text,
+                //     fragmentShader: document.
+                //         getElementById('fragShader').text,
+                // });
+                // var playGeometry = new THREE.PlaneGeometry(1, 1);
+                // var playIcon = new THREE.Mesh(geometry2, material2);
+                // scene.add(playIcon);
+
+
+
+
+                // color stuff
+
+                discret = 1;
+
+                colorSpaceMaterial = new THREE.ShaderMaterial({
+                    vertexShader: document.getElementById('RGBVertexShader').textContent,
+                    fragmentShader: document.getElementById('RGBFragmentShader').textContent,
+                    uniforms: {
+                        tex: { value: imageProcessing.rtt.texture },
+                        pointSize: { value: 10. },
+                        shadow: { value: 1.0 },
+                        label: { value: 2 }
+                    }
+                });
+                //colorSpaceMaterial.needsUpdate = true;
+
+                shadowMaterial = new THREE.ShaderMaterial({
+                    vertexShader: document.getElementById('RGBVertexShader').textContent,
+                    fragmentShader: document.getElementById('RGBFragmentShader').textContent,
+                    uniforms: {
+                        tex: { value: imageProcessing.rtt.texture },
+                        pointSize: { value: 10. },
+                        shadow: { value: 0.0 },
+                        label: { value: 2 }
+                    }
+                });
+
+                const geometry3 = new THREE.BufferGeometry();
+                const positions = [];
+                let compteur = 0;
+                for (let i = 0; i < imageProcessing.rtt.texture.image.height; i += discret)
+                    for (let j = 0; j < imageProcessing.rtt.texture.image.width; j += discret) {
+                        // positions
+
+                        const x = (i + 0.5) / imageProcessing.rtt.texture.image.height;
+                        const y = (j + 0.5) / imageProcessing.rtt.texture.image.width;
+                        const z = 0;
+
+                        positions.push(x, y, z);
+                        compteur++;
+                    }
+
+                console.log(compteur);
+                console.log(imageProcessing.rtt.texture.image.height);
+                geometry3.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                geometry3.computeBoundingSphere();
+
+                points = new THREE.Points(geometry3, colorSpaceMaterial);
+                scene.add(points);
+                points.scale.set(0.25, 0.25, 0.25);
+                points.position.x = 0.25;
+                points.position.z = 0.25;
+
+                points2 = new THREE.Points(geometry3, shadowMaterial);
+                scene.add(points2);
+                points.add(points2);
+                points2.position.x = 0.5;
+                points2.position.y = -1;
+
+                points.visible = false;
+
+
+
+                const color = 0xFFFFFF;
+                const intensity = 1;
+                const light = new THREE.DirectionalLight(color, intensity);
+                light.position.set(2, -2, 4);
+                scene.add(light)
+
+                const cyl_mat = new THREE.MeshPhongMaterial({
+                    side: THREE.DoubleSide,
+                })
+                cyl_mat.color.setRGB(1, 0, 0);
+                cyl_mat.transparent = true;
+                cyl_mat.opacity = 0.25;
+                pausePlayBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                // pausePlayBut.position.x = -0.7;
+                // pausePlayBut.position.y = -0.3;
+                // pausePlayBut.position.z = -0.3;
+                pausePlayBut.rotation.x = Math.PI / 2;
+                scene.add(pausePlayBut);
+                pausePlayBut.position.x = -0.45;
+                pausePlayBut.position.y = -0.4;
+                pausePlayBut.position.z = -0.35;
+
+                elevationBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                // pausePlayBut.position.x = -0.7;
+                // pausePlayBut.position.y = -0.3;
+                // pausePlayBut.position.z = -0.3;
+                elevationBut.rotation.x = Math.PI / 2;
+                scene.add(elevationBut);
+                elevationBut.position.x = -0.30;
+                elevationBut.position.y = -0.4;
+                elevationBut.position.z = -0.35;
+
+                cloudBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                cloudBut.rotation.x = Math.PI / 2;
+                scene.add(cloudBut);
+                cloudBut.position.x = -0.15;
+                cloudBut.position.y = -0.4;
+                cloudBut.position.z = -0.35;
+
+                skipBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                skipBut.rotation.x = Math.PI / 2;
+                scene.add(skipBut);
+                skipBut.position.x = 0.0;
+                skipBut.position.y = -0.4;
+                skipBut.position.z = -0.35;
+
+                angleBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                angleBut.rotation.x = Math.PI / 2;
+                scene.add(angleBut);
+                angleBut.position.x = 0.15;
+                angleBut.position.y = -0.4;
+                angleBut.position.z = -0.35;
+
+                flattenBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                flattenBut.rotation.x = Math.PI / 2;
+                scene.add(flattenBut);
+                flattenBut.position.x = 0.30;
+                flattenBut.position.y = -0.4;
+                flattenBut.position.z = -0.35;
+
+                hideBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                hideBut.rotation.x = Math.PI / 2;
+                scene.add(hideBut);
+                hideBut.position.x = 0.45;
+                hideBut.position.y = -0.4;
+                hideBut.position.z = -0.35;
+
+                // top row
+
+                invertBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                invertBut.rotation.x = Math.PI / 2;
+                scene.add(invertBut);
+                invertBut.position.x = -0.45;
+                invertBut.position.y = 0.4;
+                invertBut.position.z = -0.35;
+
+                colorBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                colorBut.rotation.x = Math.PI / 2;
+                scene.add(colorBut);
+                colorBut.position.x = -0.30;
+                colorBut.position.y = 0.4;
+                colorBut.position.z = -0.35;
+                colorBut.visible = false;
+
+                compBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                compBut.rotation.x = Math.PI / 2;
+                scene.add(compBut);
+                compBut.position.x = -0.15;
+                compBut.position.y = 0.4;
+                compBut.position.z = -0.35;
+                compBut.visible = false;
+
+                centerBut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.01, 20), cyl_mat);
+                centerBut.rotation.x = Math.PI / 2;
+                scene.add(centerBut);
+                centerBut.position.x = -0.0;
+                centerBut.position.y = 0.4;
+                centerBut.position.z = -0.35;
+                centerBut.visible = false;
+
+
+
+                // var lineMaterial = new THREE.LineBasicMaterial({
+                //     color: 0x0000ff
+                // });
+
+                // var linePoints = [];
+                // // linePoints.push(new THREE.Vector3(- 1, 0, 0));
+                // // linePoints.push(new THREE.Vector3(1, 0, 0));
+
+                // var lineGeometry;
+
+                // var line;
+                // scene.add(line);
+
+                // for (let i = -15; i < 15; i += 1) {
+                //     for (let j = -15; j < 15; j += 1) {
+                //         linePoints = [];
+                //         linePoints.push(new THREE.Vector3(- i/2, -1, -j/2));
+                //         linePoints.push(new THREE.Vector3(i/2, -1, -j/2));
+
+                //         lineGeometry = new THREE.BufferGeometry().setFromPoints(linePoints);
+                //         line = new THREE.Line(lineGeometry, lineMaterial);
+                //         scene.add(line);
+                //     }
+                // }
+
+
+
+
+
+                var playMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("play.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                var playGeometry = new THREE.PlaneGeometry(1, 1, 100, 100);
+
+                playIcon = new THREE.Mesh(playGeometry, playMaterial);
+
+                playIcon.transparent = true;
+                playIcon.scale.set(0.1, 0.1, 0.1);
+                playIcon.rotation.x = Math.PI / 2;
+                playIcon.position.y = 0.006;
+
+                scene.add(playIcon);
+                pausePlayBut.add(playIcon);
+                playIcon.visible = false;
+
+
+
+
+                var pauseMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("pause.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                pauseIcon = new THREE.Mesh(playGeometry, pauseMaterial);
+                pauseIcon.transparent = true;
+                pauseIcon.scale.set(0.1, 0.1, 0.1);
+                pauseIcon.rotation.x = Math.PI / 2;
+                pauseIcon.position.y = 0.006;
+
+                scene.add(pauseIcon);
+                pausePlayBut.add(pauseIcon);
+
+
+
+                var elevMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("elevation.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                var elevIcon = new THREE.Mesh(playGeometry, elevMaterial);
+
+                elevIcon.transparent = true;
+                elevIcon.scale.set(0.08, 0.08, 0.08);
+                elevIcon.rotation.x = Math.PI / 2;
+                elevIcon.rotation.z = Math.PI;
+                elevIcon.position.y = 0.006;
+
+                scene.add(elevIcon);
+                elevationBut.add(elevIcon);
+
+
+
+
+                var cloudMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("cloud.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                var cloudIcon = new THREE.Mesh(playGeometry, cloudMaterial);
+
+                cloudIcon.transparent = true;
+                cloudIcon.scale.set(0.08, 0.06, 0.08);
+                cloudIcon.rotation.x = Math.PI / 2;
+                cloudIcon.rotation.z = Math.PI;
+                cloudIcon.position.y = 0.006;
+
+                scene.add(cloudIcon);
+                cloudBut.add(cloudIcon);
+
+
+
+                var centerMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("center.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                var centerIcon = new THREE.Mesh(playGeometry, centerMaterial);
+
+                centerIcon.transparent = true;
+                centerIcon.scale.set(0.07, 0.07, 0.07);
+                centerIcon.rotation.x = Math.PI / 2;
+                centerIcon.rotation.z = Math.PI;
+                centerIcon.position.y = 0.006;
+
+                scene.add(centerIcon);
+                centerBut.add(centerIcon);
+
+
+
+
+
+                const fontLoader = new THREE.FontLoader();
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = '+10';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    var addIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    addIcon.scale.set(0.01, 0.01, 0.01);
+
+                    scene.add(addIcon);
+                    skipBut.add(addIcon);
+
+                    addIcon.rotation.x = Math.PI / 2;
+                    addIcon.rotation.z = Math.PI;
+                    addIcon.rotation.y = Math.PI;
+                    addIcon.position.y = 0.006;
+                    addIcon.position.x = -0.04;
+                    addIcon.position.z = 0.01;
+
+                });
+
+
+
+                var invertMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("invert.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                var invertIcon = new THREE.Mesh(playGeometry, invertMaterial);
+
+                invertIcon.transparent = true;
+                invertIcon.scale.set(0.08, 0.08, 0.08);
+                invertIcon.rotation.x = Math.PI / 2;
+                invertIcon.rotation.z = Math.PI;
+                invertIcon.position.y = 0.006;
+                invertIcon.position.z = -0.001;
+
+                scene.add(invertIcon);
+                invertBut.add(invertIcon);
+
+
+
+
+                var rotMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("rotate.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                var rotateIcon = new THREE.Mesh(playGeometry, rotMaterial);
+
+                rotateIcon.transparent = true;
+                rotateIcon.scale.set(0.07, 0.08, 0.08);
+                rotateIcon.rotation.x = Math.PI / 2;
+                rotateIcon.rotation.z = Math.PI;
+                rotateIcon.position.y = 0.006;
+                rotateIcon.position.z = -0.001;
+
+                scene.add(rotateIcon);
+                angleBut.add(rotateIcon);
+
+
+
+                var flatMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("flatten.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                var flatIcon = new THREE.Mesh(playGeometry, flatMaterial);
+
+                flatIcon.transparent = true;
+                flatIcon.scale.set(0.07, 0.07, 0.07);
+                flatIcon.rotation.x = Math.PI / 2;
+                flatIcon.rotation.z = Math.PI;
+                flatIcon.position.y = 0.006;
+                flatIcon.position.z = -0.001;
+
+                scene.add(flatIcon);
+                flattenBut.add(flatIcon);
+
+
+
+
+                var hideMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { type: "f", value: 1.0 },
+                        resolution: { type: "v2", value: new THREE.Vector2() },
+                        tex: { type: "t", value: THREE.ImageUtils.loadTexture("hide.png") }
+                    },
+                    transparent: true,
+                    side: THREE.DoubleSide,
+                    vertexShader: document.getElementById('imageVertexShader').textContent,
+                    fragmentShader: document.getElementById('imageFragmentShader').textContent
+                });
+
+                var hideIcon = new THREE.Mesh(playGeometry, hideMaterial);
+
+                hideIcon.transparent = true;
+                hideIcon.scale.set(0.08, 0.08, 0.08);
+                hideIcon.rotation.x = Math.PI / 2;
+                hideIcon.rotation.z = Math.PI;
+                hideIcon.position.y = 0.006;
+
+                scene.add(hideIcon);
+                hideBut.add(hideIcon);
+
+
+
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'Space:';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    var spaceIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    spaceIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(spaceIcon);
+                    colorBut.add(spaceIcon);
+
+                    spaceIcon.rotation.x = Math.PI / 2;
+                    spaceIcon.rotation.z = Math.PI;
+                    spaceIcon.rotation.y = Math.PI;
+                    spaceIcon.position.y = 0.006;
+                    spaceIcon.position.x = -0.03;
+                    spaceIcon.position.z = -0.01;
+
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'Lab';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    labIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    labIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(labIcon);
+                    colorBut.add(labIcon);
+
+                    labIcon.rotation.x = Math.PI / 2;
+                    labIcon.rotation.z = Math.PI;
+                    labIcon.rotation.y = Math.PI;
+                    labIcon.position.y = 0.006;
+                    labIcon.position.x = -0.02;
+                    labIcon.position.z = 0.02;
+
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'RGB';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    RGBIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    RGBIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(RGBIcon);
+                    colorBut.add(RGBIcon);
+
+                    RGBIcon.rotation.x = Math.PI / 2;
+                    RGBIcon.rotation.z = Math.PI;
+                    RGBIcon.rotation.y = Math.PI;
+                    RGBIcon.position.y = 0.006;
+                    RGBIcon.position.x = -0.02;
+                    RGBIcon.position.z = 0.02;
+
+                    RGBIcon.visible = false;
+
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'XYZ';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    XYZIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    XYZIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(XYZIcon);
+                    colorBut.add(XYZIcon);
+
+                    XYZIcon.rotation.x = Math.PI / 2;
+                    XYZIcon.rotation.z = Math.PI;
+                    XYZIcon.rotation.y = Math.PI;
+                    XYZIcon.position.y = 0.006;
+                    XYZIcon.position.x = -0.02;
+                    XYZIcon.position.z = 0.02;
+
+                    XYZIcon.visible = false;
+
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'Axis:';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    var axisIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    axisIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(axisIcon);
+                    compBut.add(axisIcon);
+
+                    axisIcon.rotation.x = Math.PI / 2;
+                    axisIcon.rotation.z = Math.PI;
+                    axisIcon.rotation.y = Math.PI;
+                    axisIcon.position.y = 0.006;
+                    axisIcon.position.x = -0.02;
+                    axisIcon.position.z = -0.01;
+
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'L';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    lIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    lIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(lIcon);
+                    compBut.add(lIcon);
+
+                    lIcon.rotation.x = Math.PI / 2;
+                    lIcon.rotation.z = Math.PI;
+                    lIcon.rotation.y = Math.PI;
+                    lIcon.position.y = 0.006;
+                    lIcon.position.x = -0.005;
+                    lIcon.position.z = 0.02;
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'a';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    aIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    aIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(aIcon);
+                    compBut.add(aIcon);
+
+                    aIcon.rotation.x = Math.PI / 2;
+                    aIcon.rotation.z = Math.PI;
+                    aIcon.rotation.y = Math.PI;
+                    aIcon.position.y = 0.006;
+                    aIcon.position.x = -0.005;
+                    aIcon.position.z = 0.02;
+
+                    aIcon.visible = false;
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'b';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    bIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    bIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(bIcon);
+                    compBut.add(bIcon);
+
+                    bIcon.rotation.x = Math.PI / 2;
+                    bIcon.rotation.z = Math.PI;
+                    bIcon.rotation.y = Math.PI;
+                    bIcon.position.y = 0.006;
+                    bIcon.position.x = -0.005;
+                    bIcon.position.z = 0.02;
+
+                    bIcon.visible = false;
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'R';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    rIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    rIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(rIcon);
+                    compBut.add(rIcon);
+
+                    rIcon.rotation.x = Math.PI / 2;
+                    rIcon.rotation.z = Math.PI;
+                    rIcon.rotation.y = Math.PI;
+                    rIcon.position.y = 0.006;
+                    rIcon.position.x = -0.005;
+                    rIcon.position.z = 0.02;
+
+                    rIcon.visible = false;
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'G';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    gIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    gIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(gIcon);
+                    compBut.add(gIcon);
+
+                    gIcon.rotation.x = Math.PI / 2;
+                    gIcon.rotation.z = Math.PI;
+                    gIcon.rotation.y = Math.PI;
+                    gIcon.position.y = 0.006;
+                    gIcon.position.x = -0.005;
+                    gIcon.position.z = 0.02;
+
+                    gIcon.visible = false;
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'B';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    blIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    blIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(blIcon);
+                    compBut.add(blIcon);
+
+                    blIcon.rotation.x = Math.PI / 2;
+                    blIcon.rotation.z = Math.PI;
+                    blIcon.rotation.y = Math.PI;
+                    blIcon.position.y = 0.006;
+                    blIcon.position.x = -0.005;
+                    blIcon.position.z = 0.02;
+
+                    blIcon.visible = false;
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'X';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    xIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    xIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(xIcon);
+                    compBut.add(xIcon);
+
+                    xIcon.rotation.x = Math.PI / 2;
+                    xIcon.rotation.z = Math.PI;
+                    xIcon.rotation.y = Math.PI;
+                    xIcon.position.y = 0.006;
+                    xIcon.position.x = -0.005;
+                    xIcon.position.z = 0.02;
+
+                    xIcon.visible = false;
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'Y';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    yIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    yIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(yIcon);
+                    compBut.add(yIcon);
+
+                    yIcon.rotation.x = Math.PI / 2;
+                    yIcon.rotation.z = Math.PI;
+                    yIcon.rotation.y = Math.PI;
+                    yIcon.position.y = 0.006;
+                    yIcon.position.x = -0.005;
+                    yIcon.position.z = 0.02;
+
+                    yIcon.visible = false;
+                });
+
+                fontLoader.load('https://threejsfundamentals.org/threejs/resources/threejs/fonts/helvetiker_regular.typeface.json', (font) => {
+                    const text = 'Z';
+
+                    const textGeometry = new THREE.TextGeometry(text, {
+                        font: font,
+                        size: 3,
+                        height: 0,
+                        curveSegments: 12,
+                        bevelEnabled: false,
+                        bevelThickness: 0.1,
+                        bevelSize: 0.3,
+                        bevelSegments: 5,
+                    });
+
+                    zIcon = new THREE.Mesh(textGeometry, new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x000000
+                    }));
+
+                    zIcon.scale.set(0.005, 0.005, 0.005);
+
+                    scene.add(zIcon);
+                    compBut.add(zIcon);
+
+                    zIcon.rotation.x = Math.PI / 2;
+                    zIcon.rotation.z = Math.PI;
+                    zIcon.rotation.y = Math.PI;
+                    zIcon.position.y = 0.006;
+                    zIcon.position.x = -0.005;
+                    zIcon.position.z = 0.02;
+
+                    zIcon.visible = false;
+                });
+
+
+
+
+
+
+
+
+
+                var pausePlayObj =
+                {
+                    pausePlay: function () {
+                        if (!video.paused) {
+                            console.log("pause");
+                            video.pause();
+                        }
+                        else {
+                            console.log("play");
+                            video.play();
+                        }
+                    },
+                    add10sec: function () {
+                        video.currentTime = video.currentTime + 10;
+                        console.log(video.currentTime);
+                    }
+                };
+
+                gui = new GUI();
+                gui.add(imageProcessingMaterial.uniforms.colorScaleR, 'value', 0, 1).name('Red');
+                gui.add(imageProcessingMaterial.uniforms.colorScaleG, 'value', 0, 1).name('Green');
+                gui.add(imageProcessingMaterial.uniforms.colorScaleB, 'value', 0, 1).name('Blue');
+                gui.add(imageProcessingMaterial.uniforms.invert, 'value').name('Invert');
+                //gui.add(pausePlayObj, 'pausePlay').name('Pause/play video');
+                gui.add(pausePlayObj, 'add10sec').name('Add 10 seconds');
+                //gui.add(scale , 'value', 0, 1).name('Scale'); 
+
+                video.play();
+
+            };
+
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+
+
+
+
+        // raycasting
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        function pausePlay() {
+            if (!video.paused) {
+                video.pause();
+                playIcon.visible = !playIcon.visible;
+                pauseIcon.visible = false;
+            }
+            else {
+                video.play();
+                pauseIcon.visible = !pauseIcon.visible;
+                playIcon.visible = false;
+            }
+        }
+
+        function showHideElev() {
+            if (!points.visible) {
+                colorBut.visible = !plane.visible;
+            }
+            compBut.visible = !plane.visible;
+            plan.visible = !plan.visible;
+            plane.visible = !plane.visible;
+        }
+
+        function showHideCloud() {
+            if (!plane.visible) {
+                colorBut.visible = !points.visible;
+            }
+            points.visible = !points.visible;
+            centerBut.visible = !centerBut.visible;
+
+        }
+
+        function incrementColorSpace() {
+            var new_label = points.material.uniforms.label.value;
+            new_label = (new_label + 1) % 3;
+            points.material.uniforms.label = { value: new_label };
+            points2.material.uniforms.label = { value: new_label };
+            plane.material.uniforms.colorLabel = { value: new_label };
+            if (new_label == 0) {
+                RGBIcon.visible = true;
+                XYZIcon.visible = false;
+                labIcon.visible = false;
+            }
+            if (new_label == 1) {
+                RGBIcon.visible = false;
+                XYZIcon.visible = true;
+                labIcon.visible = false;
+            }
+            if (new_label == 2) {
+                RGBIcon.visible = false;
+                XYZIcon.visible = false;
+                labIcon.visible = true;
+            }
+
+            var id = 3 * plane.material.uniforms.colorLabel.value + plane.material.uniforms.axisLabel.value;
+            showProperLetter(id);
+        }
+
+        function showProperLetter(id) {
+            var visibility = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+            visibility[id] = 1;
+            var icons = [rIcon, gIcon, blIcon, xIcon, yIcon, zIcon, aIcon, lIcon, bIcon];
+            //bIcon.visible = true;
+            for (let i = 0; i < 9; i += 1) {
+                icons[i].visible = (visibility[i] == 1);
+            }
+        }
+
+        function incrementAxis() {
+            var new_label = plane.material.uniforms.axisLabel.value;
+            new_label = (new_label + 1) % 3;
+            plane.material.uniforms.axisLabel = { value: new_label };
+            var id = 3 * plane.material.uniforms.colorLabel.value + plane.material.uniforms.axisLabel.value;
+            showProperLetter(id);
+        }
+
+        function skip() {
+            video.currentTime = video.currentTime + 10;
+        }
+
+        function inversion() {
+            imageProcessingMaterial.uniforms.invert = { value: !imageProcessingMaterial.uniforms.invert.value };
+        }
+
+        function rotateScreen() {
+            if (plan.visible) { plan.rotation.x -= Math.PI / 4 };
+            if (plane.visible) { plane.rotation.x -= Math.PI / 4 };
+        }
+
+        function flatten() {
+            if (curveMaterial.uniforms.scale.value == 1.0) { curveMaterial.uniforms.scale.value = 0.0 }
+            else { curveMaterial.uniforms.scale.value = 1.0 };
+        }
+
+        function hideScreen() {
+            if (plan.visible) { plan.visible = !plan.visible; }
+            else if (plane.visible) { plane.visible = !plane.visible; }
+            else { plan.visible = !plan.visible; }
+        }
+
+        function centerCloud() {
+            if (points.position.x == 0.25) {
+                points.position.x = 0;
+                points.position.z = 0.5;
+            }
+            else {
+                points.position.x = 0.25;
+                points.position.z = 0.25;
+            }
+        }
+
+        function onMouseMove(event) {
+
+            // calculate mouse position in normalized device coordinates
+            // (-1 to +1) for both components
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+
+        }
+
+        function act() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children);
+            if (intersects[intersects.length - 1].object.position == pausePlayBut.position) { pausePlay() }
+            if (intersects[intersects.length - 1].object.position == elevationBut.position) { showHideElev() }
+            if (intersects[intersects.length - 1].object.position == cloudBut.position) { showHideCloud() }
+            if (intersects[intersects.length - 1].object.position == colorBut.position) { incrementColorSpace() }
+            if (intersects[intersects.length - 1].object.position == compBut.position) { incrementAxis() }
+            if (intersects[intersects.length - 1].object.position == skipBut.position) { skip() }
+            if (intersects[intersects.length - 1].object.position == invertBut.position) { inversion() }
+            if (intersects[intersects.length - 1].object.position == angleBut.position) { rotateScreen() }
+            if (intersects[intersects.length - 1].object.position == flattenBut.position) { flatten() }
+            if (intersects[intersects.length - 1].object.position == hideBut.position) { hideScreen() }
+            if (intersects[intersects.length - 1].object.position == centerBut.position) { centerCloud() }
+
+        }
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('click', act);
+
+
+
+
+
+
+        function render() {
+            renderer.clear();
+
+            // raycaster.setFromCamera(mouse, camera);
+            // const intersects = raycaster.intersectObjects(scene.children);
+            // for (let i = 0; i < intersects.length; i++) {
+
+            //     intersects[i].object.material.color.set(0x00FF00);
+
+            // }
+
+            //pickHelper.pick(pickPosition, scene, camera);
+
+            if (typeof imageProcessing !== 'undefined')
+                IVprocess(imageProcessing, renderer);
+            renderer.render(scene, camera);
+
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            render();
+        }
+
+        function onWindowResize() {
+            camera.aspect = (window.innerWidth / window.innerHeight);
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            render();
+        }
+
+    </script>
+</body>
+
+</html>
